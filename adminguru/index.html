@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>INFORA — Portal Guru Informatika</title>
+  <meta name="description" content="Portal Pengelolaan Materi, Bank Soal, dan RAG Informatika SMK untuk Guru INFORA.">
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/teacher.css">
+  <link rel="stylesheet" href="/css/responsive.css">
+</head>
+<body>
+
+  <!-- SCREEN 1: TEACHER AUTHENTICATION (Login & Register) -->
+  <div id="teacher-auth-screen" class="teacher-auth-wrap" style="display: none;">
+    <div class="teacher-auth-card">
+      <div class="teacher-auth-header">
+        <div style="width: 46px; height: 46px; margin: 0 auto; background: var(--color-primary); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; color: white;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            <path d="m9 9 2 2 4-4"></path>
+          </svg>
+        </div>
+        <h1>INFORA — Portal Guru</h1>
+        <p>Kelola materi pembelajaran, bank soal, dan bank pengetahuan RAG siswa SMK</p>
+      </div>
+
+      <div class="teacher-auth-tabs">
+        <button type="button" class="auth-tab-btn active" id="tab-btn-login">Masuk Akun</button>
+        <button type="button" class="auth-tab-btn" id="tab-btn-register">Daftar Guru Baru</button>
+      </div>
+
+      <div class="teacher-auth-body">
+        <!-- Form Login -->
+        <form id="form-login" style="display: flex; flex-direction: column; gap: 14px;">
+          <div class="form-group">
+            <label for="login-email" class="form-label">Email Guru <span class="req">*</span></label>
+            <input type="email" id="login-email" class="form-input" placeholder="guru@smk.belajar.id" required autocomplete="username" />
+          </div>
+          <div class="form-group">
+            <label for="login-password" class="form-label">Kata Sandi <span class="req">*</span></label>
+            <input type="password" id="login-password" class="form-input" placeholder="••••••••" required autocomplete="current-password" />
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 6px;">
+            Masuk Portal Guru
+          </button>
+        </form>
+
+        <!-- Form Register -->
+        <form id="form-register" style="display: none; flex-direction: column; gap: 14px;">
+          <div class="form-group">
+            <label for="reg-name" class="form-label">Nama Lengkap &amp; Gelar <span class="req">*</span></label>
+            <input type="text" id="reg-name" class="form-input" placeholder="Budi Santoso, S.Kom., M.T." required />
+          </div>
+          <div class="form-group">
+            <label for="reg-email" class="form-label">Email Resmi <span class="req">*</span></label>
+            <input type="email" id="reg-email" class="form-input" placeholder="budi@smkn1.sch.id" required autocomplete="email" />
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label for="reg-school" class="form-label">Nama Sekolah (SMK)</label>
+              <input type="text" id="reg-school" class="form-input" placeholder="SMK Negeri 1" />
+            </div>
+            <div class="form-group">
+              <label for="reg-nip" class="form-label">NIP / ID Guru</label>
+              <input type="text" id="reg-nip" class="form-input" placeholder="19850101..." />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="reg-password" class="form-label">Kata Sandi <span class="req">*</span></label>
+            <input type="password" id="reg-password" class="form-input" placeholder="Minimal 6 karakter" required autocomplete="new-password" />
+          </div>
+          <div class="form-group">
+            <label for="reg-confirm-password" class="form-label">Konfirmasi Kata Sandi <span class="req">*</span></label>
+            <input type="password" id="reg-confirm-password" class="form-input" placeholder="Ulangi kata sandi" required autocomplete="new-password" />
+          </div>
+          <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 6px;">
+            Daftar Akun Guru
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: TEACHER DASHBOARD -->
+  <div id="teacher-dashboard-screen" class="teacher-layout" style="display: none;">
+    
+    <!-- Sidebar -->
+    <aside class="teacher-sidebar">
+      <div class="teacher-sidebar-brand">
+        <div style="width: 32px; height: 32px; background: var(--color-primary); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; color: white;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+        </div>
+        <div>
+          <div style="font-weight: 800; font-size: 1.1rem; color: var(--color-primary); line-height: 1;">INFORA</div>
+          <div style="font-size: 0.72rem; color: var(--color-text-secondary);">Portal Guru SMK</div>
+        </div>
+      </div>
+
+      <nav class="teacher-nav" aria-label="Menu Guru">
+        <button type="button" class="teacher-nav-item active" data-view="overview">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          Ringkasan
+        </button>
+        <button type="button" class="teacher-nav-item" data-view="materials">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          Kelola Materi
+        </button>
+        <button type="button" class="teacher-nav-item" data-view="questions">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          Kelola Soal
+        </button>
+        <button type="button" class="teacher-nav-item" data-view="quizzes">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          Kelola Kuis
+        </button>
+        <button type="button" class="teacher-nav-item" data-view="rag-status">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          Sistem RAG &amp; AI
+        </button>
+        <button type="button" class="teacher-nav-item" data-view="profile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          Profil Guru
+        </button>
+      </nav>
+
+      <div class="teacher-sidebar-footer">
+        <div class="teacher-user-info">
+          <span class="teacher-user-name" id="sidebar-user-name">Guru Informatika</span>
+          <span class="teacher-user-role" id="sidebar-user-role">SMK</span>
+        </div>
+        <button type="button" class="btn-icon danger" id="btn-logout" title="Keluar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="teacher-main">
+      <header class="teacher-topbar">
+        <h1 class="teacher-page-title" id="page-title">Ringkasan Portal Guru</h1>
+        <div style="display: flex; gap: 8px;">
+          <a href="/" target="_blank" class="btn btn-outline btn-sm">
+            👁️ Buka Chatbot Siswa
+          </a>
+        </div>
+      </header>
+
+      <div class="teacher-content-area">
+        
+        <!-- VIEW 1: OVERVIEW -->
+        <div id="panel-overview" class="view-panel">
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon red">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value" id="stat-materials">0</span>
+                <span class="stat-label">Total Materi Tersimpan</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon green">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value" id="stat-published">0</span>
+                <span class="stat-label">Materi Aktif di RAG</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon blue">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value" id="stat-questions">0</span>
+                <span class="stat-label">Bank Soal Tersedia</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon orange">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value" id="stat-chunks">0</span>
+                <span class="stat-label">Vektor Chunks pgvector</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions & Guidelines Card -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <span class="panel-title">Pedoman Guru INFORA &amp; Alur RAG</span>
+            </div>
+            <div style="padding: 20px; line-height: 1.6; font-size: 0.92rem;">
+              <p>Selamat datang di portal manajemen guru INFORA! Sistem ini menghubungkan materi pembelajaran dan bank soal yang Anda terbitkan langsung ke otak chatbot AI siswa melalui arsitektur <strong>Retrieval-Augmented Generation (RAG)</strong>.</p>
+              
+              <div style="margin-top: 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
+                <div style="background: var(--color-surface); padding: 14px; border-radius: var(--radius-md); border-left: 3px solid var(--color-primary);">
+                  <strong>1. Tambah &amp; Terbitkan Materi:</strong>
+                  <p style="font-size:0.84rem; color:var(--color-text-secondary); margin-top:4px;">Materi yang berstatus <em>Published</em> otomatis dipecah menjadi potongan teks (chunks) dan diubah menjadi embedding vektor pgvector.</p>
+                </div>
+                <div style="background: var(--color-surface); padding: 14px; border-radius: var(--radius-md); border-left: 3px solid var(--color-success);">
+                  <strong>2. Siswa Bertanya Mandiri:</strong>
+                  <p style="font-size:0.84rem; color:var(--color-text-secondary); margin-top:4px;">Siswa SMK mengakses homepage tanpa login. Sistem RAG mencari potongan materi Anda yang paling relevan untuk menjawab siswa.</p>
+                </div>
+                <div style="background: var(--color-surface); padding: 14px; border-radius: var(--radius-md); border-left: 3px solid var(--color-warning);">
+                  <strong>3. Filter Topik Ketat:</strong>
+                  <p style="font-size:0.84rem; color:var(--color-text-secondary); margin-top:4px;">Pertanyaan di luar materi Informatika SMK langsung ditolak dengan satu kalimat standar.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW 2: MATERIALS MANAGEMENT -->
+        <div id="panel-materials" class="view-panel" style="display: none;">
+          <div class="panel-card">
+            <div class="panel-header">
+              <span class="panel-title">Daftar Materi Pembelajaran Informatika</span>
+              <div class="panel-actions">
+                <input type="file" id="import-materials-file" accept=".json" style="display:none;" />
+                <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('import-materials-file').click()">
+                  📥 Impor JSON
+                </button>
+                <button type="button" class="btn btn-outline btn-sm" id="btn-export-materials">
+                  📤 Ekspor JSON
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" id="btn-add-material">
+                  ➕ Tambah Materi Baru
+                </button>
+              </div>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="filter-bar">
+              <div class="search-input-wrap">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" class="form-input" id="mat-search-input" placeholder="Cari judul, kata kunci, konsep..." />
+              </div>
+              <select class="form-select" id="mat-cat-filter" style="width: 220px;">
+                <option value="">Semua Kategori</option>
+                <option value="Jaringan Komputer">Jaringan Komputer</option>
+                <option value="Pemrograman">Pemrograman</option>
+                <option value="Pengembangan Web">Pengembangan Web</option>
+                <option value="Basis Data">Basis Data</option>
+                <option value="Sistem Komputer">Sistem Komputer</option>
+                <option value="Keamanan Digital">Keamanan Digital</option>
+                <option value="Berpikir Komputasional">Berpikir Komputasional</option>
+                <option value="Kecerdasan Buatan (AI)">Kecerdasan Buatan (AI)</option>
+              </select>
+              <select class="form-select" id="mat-status-filter" style="width: 160px;">
+                <option value="">Semua Status</option>
+                <option value="published">Diterbitkan</option>
+                <option value="draft">Draf</option>
+                <option value="archived">Diarsipkan</option>
+              </select>
+            </div>
+
+            <div class="data-table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Judul Materi</th>
+                    <th>Kategori</th>
+                    <th>Status</th>
+                    <th>RAG Chunks</th>
+                    <th>Pembaruan</th>
+                    <th style="width: 100px;">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="materials-table-body">
+                  <!-- Injected dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW 3: QUESTIONS MANAGEMENT -->
+        <div id="panel-questions" class="view-panel" style="display: none;">
+          <div class="panel-card">
+            <div class="panel-header">
+              <span class="panel-title">Bank Soal &amp; Latihan</span>
+              <div class="panel-actions">
+                <button type="button" class="btn btn-primary btn-sm" id="btn-add-question">
+                  ➕ Buat Soal Baru
+                </button>
+              </div>
+            </div>
+
+            <div class="data-table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Pertanyaan &amp; Kunci</th>
+                    <th>Kategori</th>
+                    <th>Tingkat</th>
+                    <th>Tipe</th>
+                    <th>Status</th>
+                    <th style="width: 100px;">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="questions-table-body">
+                  <!-- Injected dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW 4: QUIZZES MANAGEMENT -->
+        <div id="panel-quizzes" class="view-panel" style="display: none;">
+          <div class="panel-card">
+            <div class="panel-header">
+              <span class="panel-title">Paket Kuis &amp; Latihan Mandiri</span>
+              <div class="panel-actions">
+                <button type="button" class="btn btn-primary btn-sm" id="btn-add-quiz">
+                  ➕ Buat Paket Kuis Baru
+                </button>
+              </div>
+            </div>
+
+            <div class="data-table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Judul Kuis</th>
+                    <th>Kategori</th>
+                    <th>Tingkat</th>
+                    <th>Jumlah Soal</th>
+                    <th>Status</th>
+                    <th style="width: 100px;">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="quizzes-table-body">
+                  <!-- Injected dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW 5: RAG & AI STATUS -->
+        <div id="panel-rag-status" class="view-panel" style="display: none;">
+          <div class="panel-card">
+            <div class="panel-header">
+              <span class="panel-title">Status Arsitektur RAG &amp; Penyedia AI</span>
+            </div>
+            <div style="padding: 24px;" id="rag-health-info">
+              <!-- Injected dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW 6: TEACHER PROFILE -->
+        <div id="panel-profile" class="view-panel" style="display: none;">
+          <div class="panel-card" style="max-width: 600px;">
+            <div class="panel-header">
+              <span class="panel-title">Profil Pengajar</span>
+            </div>
+            <form id="profile-form" style="padding: 20px;">
+              <div class="form-group">
+                <label for="profile-name" class="form-label">Nama Lengkap &amp; Gelar</label>
+                <input type="text" id="profile-name" class="form-input" required />
+              </div>
+              <div class="form-group">
+                <label for="profile-email" class="form-label">Email Terdaftar (Akun)</label>
+                <input type="email" id="profile-email" class="form-input" readonly disabled style="opacity: 0.7;" />
+              </div>
+              <div class="form-group">
+                <label for="profile-school" class="form-label">Nama Sekolah / SMK</label>
+                <input type="text" id="profile-school" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label for="profile-nip" class="form-label">NIP / Identitas Guru</label>
+                <input type="text" id="profile-nip" class="form-input" />
+              </div>
+              <button type="submit" class="btn btn-primary" style="margin-top: 10px;">
+                Simpan Pembaruan Profil
+              </button>
+            </form>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container" aria-live="assertive"></div>
+
+  <script type="module" src="/js/teacher-app.js"></script>
+</body>
+</html>

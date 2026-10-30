@@ -1,0 +1,8 @@
+{
+  "name": "INFORA — AI Pembelajaran Informatika SMK",
+  "description": "Chatbot AI Pembelajaran Informatika SMK Berbasis Retrieval-Augmented Generation (RAG), Multi-Guru, dan Database Bersama.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

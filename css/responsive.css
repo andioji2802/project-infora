@@ -1,0 +1,90 @@
+/* INFORA — Responsive Styles */
+
+@media (max-width: 900px) {
+  .teacher-sidebar {
+    width: 210px;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .chat-app {
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .chat-messages {
+    padding: 16px 12px;
+    gap: 16px;
+  }
+
+  .msg-bubble-wrap {
+    max-width: 90%;
+  }
+
+  .welcome-hero {
+    padding: 18px 14px;
+  }
+
+  .welcome-hero h2 {
+    font-size: 1.15rem;
+  }
+
+  .teacher-layout {
+    flex-direction: column;
+  }
+
+  .teacher-sidebar {
+    width: 100%;
+    height: auto;
+    position: relative;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .teacher-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 8px 12px;
+  }
+
+  .teacher-nav-item {
+    white-space: nowrap;
+    padding: 8px 12px;
+    font-size: 0.84rem;
+  }
+
+  .teacher-content-area {
+    padding: 16px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .modal-content {
+    max-height: 95vh;
+  }
+}
+
+@media (max-width: 480px) {
+  .chat-header {
+    padding: 10px 14px;
+  }
+
+  .chat-brand-info h1 {
+    font-size: 1.02rem;
+  }
+
+  .chat-input-bar {
+    padding: 10px 12px;
+  }
+
+  .chip {
+    font-size: 0.78rem;
+    padding: 6px 10px;
+  }
+}

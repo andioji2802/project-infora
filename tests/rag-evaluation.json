@@ -1,0 +1,26 @@
+[
+  {
+    "query": "Jelaskan cara menghitung subnet mask /26 dan jumlah host validnya",
+    "expected_material_slug": "jaringan-komputer-subnetting-ip-dan-cidr",
+    "expected_keywords": ["255.255.255.192", "62 host", "broadcast"],
+    "minimum_similarity": 0.35
+  },
+  {
+    "query": "Apa saja empat pilar berpikir komputasional dalam mata pelajaran Informatika?",
+    "expected_material_slug": "berpikir-komputasional-dan-logika-algoritma-dasar",
+    "expected_keywords": ["dekomposisi", "abstraksi", "pengenalan pola", "algoritma"],
+    "minimum_similarity": 0.35
+  },
+  {
+    "query": "Bagaimana cara melakukan styling flexbox untuk menata elemen secara horizontal?",
+    "expected_material_slug": "pengembangan-web-html5-flexbox-dom-javascript",
+    "expected_keywords": ["display: flex", "justify-content", "align-items"],
+    "minimum_similarity": 0.35
+  },
+  {
+    "query": "Jelaskan perbedaan bentuk normal 1NF, 2NF, dan 3NF pada basis data",
+    "expected_material_slug": "basis-data-relasional-erd-normalisasi-dan-query-sql",
+    "expected_keywords": ["normalisasi", "1nf", "transitif", "atomic"],
+    "minimum_similarity": 0.35
+  }
+]
