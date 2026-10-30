@@ -3,6 +3,8 @@
  * Token storage and authentication API calls with secure session handling.
  */
 
+import { apiUrl } from './api-config.js';
+
 const TOKEN_KEY = 'infora_teacher_token';
 
 export function getAuthToken() {
@@ -22,7 +24,7 @@ export function clearAuthToken() {
 }
 
 export async function loginTeacher(email, password) {
-  const res = await fetch('/api/auth/login', {
+  const res = await fetch(apiUrl('/api/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password })
@@ -38,7 +40,7 @@ export async function loginTeacher(email, password) {
 }
 
 export async function registerTeacher(userData) {
-  const res = await fetch('/api/auth/register', {
+  const res = await fetch(apiUrl('/api/auth/register'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(userData)
@@ -58,7 +60,7 @@ export async function getCurrentTeacher() {
   if (!token) return null;
 
   try {
-    const res = await fetch('/api/auth/me', {
+    const res = await fetch(apiUrl('/api/auth/me'), {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -80,7 +82,7 @@ export async function getCurrentTeacher() {
 export async function logoutTeacher() {
   const token = getAuthToken();
   if (token) {
-    await fetch('/api/auth/logout', {
+    await fetch(apiUrl('/api/auth/logout'), {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}` }
     }).catch(() => {});

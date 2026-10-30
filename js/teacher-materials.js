@@ -6,6 +6,7 @@
 import { getAuthToken } from './auth.js';
 import { escapeHtml, showToast, renderSafeMarkdown } from './utils.js';
 import { validateMaterialForm } from './validation.js';
+import { apiUrl } from './api-config.js';
 
 export class TeacherMaterialsManager {
   constructor(appContext) {
@@ -17,7 +18,7 @@ export class TeacherMaterialsManager {
   async loadMaterials() {
     try {
       const token = getAuthToken();
-      const res = await fetch('/api/materials', {
+      const res = await fetch(apiUrl('/api/materials'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Gagal memuat materi');
@@ -280,7 +281,7 @@ export class TeacherMaterialsManager {
       const url = materialId ? `/api/materials/${materialId}` : '/api/materials';
       const method = materialId ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
+      const res = await fetch(apiUrl(url), {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -303,7 +304,7 @@ export class TeacherMaterialsManager {
   async deleteMaterial(materialId) {
     try {
       const token = getAuthToken();
-      const res = await fetch(`/api/materials/${materialId}`, {
+      const res = await fetch(apiUrl(`/api/materials/${materialId}`), {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

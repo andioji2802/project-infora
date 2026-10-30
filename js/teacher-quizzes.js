@@ -5,6 +5,7 @@
 
 import { getAuthToken } from './auth.js';
 import { escapeHtml, showToast } from './utils.js';
+import { apiUrl } from './api-config.js';
 
 export class TeacherQuizzesManager {
   constructor(appContext) {
@@ -15,7 +16,7 @@ export class TeacherQuizzesManager {
   async loadQuizzes() {
     try {
       const token = getAuthToken();
-      const res = await fetch('/api/quizzes', {
+      const res = await fetch(apiUrl('/api/quizzes'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Gagal memuat paket kuis');
@@ -112,7 +113,7 @@ export class TeacherQuizzesManager {
     let availableQuestions = [];
     try {
       const token = getAuthToken();
-      const res = await fetch('/api/questions', { headers: { 'Authorization': `Bearer ${token}` } });
+      const res = await fetch(apiUrl('/api/questions'), { headers: { 'Authorization': `Bearer ${token}` } });
       if (res.ok) availableQuestions = await res.json();
     } catch (e) {}
 
@@ -228,7 +229,7 @@ export class TeacherQuizzesManager {
       const url = quizId ? `/api/quizzes/${quizId}` : '/api/quizzes';
       const method = quizId ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
+      const res = await fetch(apiUrl(url), {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -251,7 +252,7 @@ export class TeacherQuizzesManager {
   async deleteQuiz(id) {
     try {
       const token = getAuthToken();
-      const res = await fetch(`/api/quizzes/${id}`, {
+      const res = await fetch(apiUrl(`/api/quizzes/${id}`), {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

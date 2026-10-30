@@ -6,6 +6,7 @@
 import { getAuthToken } from './auth.js';
 import { escapeHtml, showToast } from './utils.js';
 import { validateQuestionForm } from './validation.js';
+import { apiUrl } from './api-config.js';
 
 export class TeacherQuestionsManager {
   constructor(appContext) {
@@ -16,7 +17,7 @@ export class TeacherQuestionsManager {
   async loadQuestions() {
     try {
       const token = getAuthToken();
-      const res = await fetch('/api/questions', {
+      const res = await fetch(apiUrl('/api/questions'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Gagal memuat bank soal');
@@ -218,7 +219,7 @@ export class TeacherQuestionsManager {
       const url = questionId ? `/api/questions/${questionId}` : '/api/questions';
       const method = questionId ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
+      const res = await fetch(apiUrl(url), {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -241,7 +242,7 @@ export class TeacherQuestionsManager {
   async deleteQuestion(id) {
     try {
       const token = getAuthToken();
-      const res = await fetch(`/api/questions/${id}`, {
+      const res = await fetch(apiUrl(`/api/questions/${id}`), {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

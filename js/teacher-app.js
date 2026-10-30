@@ -9,6 +9,7 @@ import { TeacherQuestionsManager } from './teacher-questions.js';
 import { TeacherQuizzesManager } from './teacher-quizzes.js';
 import { escapeHtml, showToast } from './utils.js';
 import { validateTeacherLogin, validateTeacherRegistration } from './validation.js';
+import { apiUrl } from './api-config.js';
 
 class TeacherApp {
   constructor() {
@@ -287,7 +288,7 @@ class TeacherApp {
   async refreshStats() {
     try {
       const token = getAuthToken();
-      const res = await fetch('/api/stats', {
+      const res = await fetch(apiUrl('/api/stats'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -327,7 +328,7 @@ class TeacherApp {
         teacher_identifier: document.getElementById('profile-nip').value.trim()
       };
 
-      const res = await fetch('/api/auth/profile', {
+      const res = await fetch(apiUrl('/api/auth/profile'), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -354,7 +355,7 @@ class TeacherApp {
     statusBox.innerHTML = '<p style="color:var(--color-text-secondary);">Memeriksa status AI dan embedding...</p>';
 
     try {
-      const res = await fetch('/api/health');
+      const res = await fetch(apiUrl('/api/health'));
       const health = await res.json();
 
       statusBox.innerHTML = `
