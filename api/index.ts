@@ -1,4 +1,4 @@
-import { db, hashPassword, verifyPassword } from '../server/db.ts';
+import { db, hashPassword, verifyPassword } from '../server/db.js';
 
 function headers(origin?: string) {
   return {
@@ -99,7 +99,7 @@ export default async function handler(req: any, res: any) {
     }
 
     if (path === '/api/chat' && method === 'POST') {
-      const { processStudentChat } = await import('../server/rag.ts');
+      const { processStudentChat } = await import('../server/rag.js');
       const message = typeof body.message === 'string' ? body.message.trim() : '';
       if (!message) return res.status(400).json({ error: 'Pesan pertanyaan tidak boleh kosong.' });
       const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
