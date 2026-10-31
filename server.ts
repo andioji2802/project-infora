@@ -665,29 +665,21 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 
 export default app;
 
-// Start Express only for local or traditional Node hosting.
 if (process.env.VERCEL !== '1') {
   const server = app.listen(PORT, async () => {
     console.log(`[INFORA] Server running on http://localhost:${PORT}`);
+
     try {
       await ensurePublishedMaterialsIndexed();
-      console.log(`[INFORA] RAG Vector Index ready with ${db.getChunks().length} chunks.`);
+      console.log(
+        `[INFORA] RAG Vector Index ready with ${db.getChunks().length} chunks.`
+      );
     } catch (err) {
       console.error('[INFORA] Warning warming RAG chunks:', err);
     }
   });
 
-  server.on('error', (err: NodeJS.ErrnoException) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(
-        `[INFORA] Port ${PORT} sudah digunakan oleh server lain.\n` +
-        'Hentikan proses lama, lalu jalankan kembali npm.cmd run dev.\n' +
-        'Perintah PowerShell: Get-NetTCPConnection -LocalPort 3000 | Select-Object OwningProcess'
-      );
-      process.exitCode = 1;
-      return;
-    }
-    console.error(`[INFORA] Server gagal dijalankan: ${err.message}`);
-    process.exitCode = 1;
+  server.on('error', (err) => {
+    console.error('[INFORA] Server error:', err);
   });
 }
