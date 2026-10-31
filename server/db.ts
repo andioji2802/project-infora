@@ -8,7 +8,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { INITIAL_TEACHERS, INITIAL_MATERIALS, INITIAL_QUESTIONS, INITIAL_QUIZZES } from './seedData.js';
 
-const DATA_DIR = path.resolve(process.cwd(), 'data');
+const DATA_DIR = process.env.VERCEL === '1'
+  ? '/tmp/infora'
+  : path.resolve(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'infora.json');
 
 export interface TeacherProfile {
