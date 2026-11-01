@@ -36,7 +36,8 @@ function rankPublicContent(query: string, rows: any[], fields: string[]): any[] 
 const CHAT_STOP_WORDS = new Set([
   'apa', 'itu', 'ini', 'yang', 'untuk', 'dengan', 'tentang', 'bagaimana',
   'cara', 'jelaskan', 'materi', 'konsep', 'dasar', 'gimana', 'nih', 'dong',
-  'sih', 'ya', 'bro', 'maksud', 'tolong', 'beri', 'berikan', 'kasih'
+  'sih', 'ya', 'bro', 'maksud', 'tolong', 'beri', 'berikan', 'kasih',
+  'data', 'basis', 'relasional', 'struktur', 'program', 'fungsi'
 ]);
 
 export function getChatTokens(text: string): string[] {
@@ -198,7 +199,11 @@ export default async function handler(req: any, res: any) {
     const message = typeof body.message === 'string' ? body.message.trim() : '';
     if (!message) return res.status(400).json({ error: 'Pesan pertanyaan tidak boleh kosong.' });
     const scope = evaluateTopicScope(message);
-    if (!scope.allowed) {
+    const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
+    const hasLearningHistory = history.some((item: any) =>
+      item?.role === 'assistant' && String(item?.content || '').length > 20
+    );
+    if (!scope.allowed && !(scope.reason === 'out_of_scope_no_informatics_context' && hasLearningHistory)) {
       return res.status(200).json({
         answer: EXACT_REFUSAL_MESSAGE,
         isRefusal: true,
@@ -324,7 +329,6 @@ export default async function handler(req: any, res: any) {
         }]
       });
     }
-    const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
     const resolvedMessage = resolveChatQuery(message, history, materials);
     const scored = rankMaterialsForChat(resolvedMessage, materials).slice(0, 3);
 
