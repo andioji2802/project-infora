@@ -6,17 +6,17 @@
 -- Insert sample teacher profile (UUID placeholder for demo)
 DO $$
 DECLARE
-    teacher_id UUID := 'a0000000-0000-0000-0000-000000000001';
-    mat_net_id UUID := 'b0000000-0000-0000-0000-000000000001';
-    mat_algo_id UUID := 'b0000000-0000-0000-0000-000000000002';
-    q_net_id UUID := 'c0000000-0000-0000-0000-000000000001';
-    q_algo_id UUID := 'c0000000-0000-0000-0000-000000000002';
-    quiz_id UUID := 'd0000000-0000-0000-0000-000000000001';
+    v_teacher_id UUID := 'a0000000-0000-0000-0000-000000000001';
+    v_mat_net_id UUID := 'b0000000-0000-0000-0000-000000000001';
+    v_mat_algo_id UUID := 'b0000000-0000-0000-0000-000000000002';
+    v_q_net_id UUID := 'c0000000-0000-0000-0000-000000000001';
+    v_q_algo_id UUID := 'c0000000-0000-0000-0000-000000000002';
+    v_quiz_id UUID := 'd0000000-0000-0000-0000-000000000001';
 BEGIN
     -- Profiles
     INSERT INTO public.profiles (id, full_name, school_name, teacher_identifier, role)
     VALUES (
-        teacher_id,
+        v_teacher_id,
         'Drs. H. Ahmad Fauzi, M.Kom.',
         'SMK Negeri 1 Bidang Keahlian TKI',
         '197505122000031002',
@@ -28,8 +28,8 @@ BEGIN
         id, owner_id, title, slug, category, grade_level,
         learning_objectives, summary, content, keywords, status
     ) VALUES (
-        mat_net_id,
-        teacher_id,
+        v_mat_net_id,
+        v_teacher_id,
         'Jaringan Komputer: Subnetting IP Address dan Notasi CIDR',
         'jaringan-komputer-subnetting-ip-dan-cidr',
         'Jaringan Komputer',
@@ -45,8 +45,8 @@ BEGIN
         id, owner_id, title, slug, category, grade_level,
         learning_objectives, summary, content, keywords, status
     ) VALUES (
-        mat_algo_id,
-        teacher_id,
+        v_mat_algo_id,
+        v_teacher_id,
         'Berpikir Komputasional dan Logika Algoritma Dasar',
         'berpikir-komputasional-dan-logika-algoritma-dasar',
         'Berpikir Komputasional',
@@ -63,9 +63,9 @@ BEGIN
         id, owner_id, material_id, category, difficulty, question_type,
         question_text, options, correct_answer, explanation, competency, status
     ) VALUES (
-        q_net_id,
-        teacher_id,
-        mat_net_id,
+        v_q_net_id,
+        v_teacher_id,
+        v_mat_net_id,
         'Jaringan Komputer',
         'Sedang',
         'multiple_choice',
@@ -81,9 +81,9 @@ BEGIN
         id, owner_id, material_id, category, difficulty, question_type,
         question_text, options, correct_answer, explanation, competency, status
     ) VALUES (
-        q_algo_id,
-        teacher_id,
-        mat_algo_id,
+        v_q_algo_id,
+        v_teacher_id,
+        v_mat_algo_id,
         'Berpikir Komputasional',
         'Mudah',
         'multiple_choice',
@@ -99,8 +99,8 @@ BEGIN
     INSERT INTO public.quizzes (
         id, owner_id, title, description, category, difficulty, status
     ) VALUES (
-        quiz_id,
-        teacher_id,
+        v_quiz_id,
+        v_teacher_id,
         'Kuis Pemahaman Dasar Jaringan Komputer & Algoritma',
         'Latihan mandiri interaktif untuk menguji subnetting IP dan berpikir komputasional.',
         'Jaringan Komputer',
@@ -111,7 +111,7 @@ BEGIN
     -- Quiz Questions
     INSERT INTO public.quiz_questions (quiz_id, question_id, position, points)
     VALUES 
-        (quiz_id, q_net_id, 1, 10),
-        (quiz_id, q_algo_id, 2, 10)
+        (v_quiz_id, v_q_net_id, 1, 10),
+        (v_quiz_id, v_q_algo_id, 2, 10)
     ON CONFLICT (quiz_id, question_id) DO NOTHING;
 END $$;
