@@ -65,11 +65,15 @@ export async function getCurrentTeacher() {
 
 export async function logoutTeacher() {
   const token = getAuthToken();
-  if (token) {
-    await fetch(apiUrl('/api/auth-logout'), {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + token }
-    }).catch(() => {});
-  }
   clearAuthToken();
+  if (token) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 2500);
+    fetch(apiUrl('/api/auth-logout'), {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token },
+      signal: controller.signal,
+      cache: 'no-store'
+    }).catch(() => {}).finally(() => window.clearTimeout(timeoutId));
+  }
 }

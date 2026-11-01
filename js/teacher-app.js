@@ -33,8 +33,21 @@ class TeacherApp {
   }
 
   showAuth() {
-    document.getElementById('teacher-auth-screen').style.display = 'flex';
-    document.getElementById('teacher-dashboard-screen').style.display = 'none';
+    const authScreen = document.getElementById('teacher-auth-screen');
+    const dashboardScreen = document.getElementById('teacher-dashboard-screen');
+    if (authScreen) authScreen.style.display = 'flex';
+    if (dashboardScreen) dashboardScreen.style.display = 'none';
+
+    const loginForm = document.getElementById('form-login');
+    const registerForm = document.getElementById('form-register');
+    const loginTab = document.getElementById('tab-btn-login');
+    const registerTab = document.getElementById('tab-btn-register');
+    if (loginForm) loginForm.reset();
+    if (registerForm) registerForm.reset();
+    if (loginForm) loginForm.style.display = 'flex';
+    if (registerForm) registerForm.style.display = 'none';
+    if (loginTab) loginTab.classList.add('active');
+    if (registerTab) registerTab.classList.remove('active');
   }
 
   showDashboard() {
@@ -208,12 +221,12 @@ class TeacherApp {
     if (logoutBtn) {
       logoutBtn.addEventListener('click', async () => {
         if (confirm('Keluar dari portal guru?')) {
+          this.user = null;
           try {
             await logoutTeacher();
           } catch (err) {
             console.error('Logout API gagal, sesi lokal tetap dibersihkan:', err);
           } finally {
-            this.user = null;
             showToast('Anda telah keluar.', 'info');
             this.showAuth();
           }
