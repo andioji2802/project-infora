@@ -189,6 +189,32 @@ test('Ranking rejects unrelated material and mismatched programming languages', 
   assert.equal(rankMaterialsForChat('Bagaimana cara mendapatkan pacar di sekolah?', materials).length, 0);
 });
 
+test('Retrieval separates number systems, database, looping, algorithm, and network topics', () => {
+  const materials = [
+    { title: 'Looping Python', category: 'Pemrograman', keywords: 'python for while range break continue', summary: 'Perulangan dalam Python.', content: 'for dan while digunakan untuk mengulang instruksi.' },
+    { title: 'Sistem Bilangan Komputer', category: 'Sistem Komputer', keywords: 'biner desimal heksadesimal konversi basis', summary: 'Konversi bilangan biner desimal dan heksadesimal.', content: 'Biner menggunakan basis dua.' },
+    { title: 'Basis Data Relasional', category: 'Basis Data', keywords: 'primary key foreign key tabel relasi database sql', summary: 'Relasi tabel melalui primary key dan foreign key.', content: 'Primary key mengidentifikasi baris unik.' },
+    { title: 'Berpikir Komputasional', category: 'Berpikir Komputasional', keywords: 'algoritma pseudocode flowchart dekomposisi', summary: 'Empat pilar berpikir komputasional.', content: 'Algoritma adalah urutan langkah penyelesaian masalah.' },
+    { title: 'Subnetting Jaringan', category: 'Jaringan Komputer', keywords: 'subnetting cidr ip address network host valid', summary: 'Pembagian jaringan IP menjadi subnet.', content: 'CIDR /26 memiliki 62 host valid.' }
+  ];
+
+  assert.equal(rankMaterialsForChat('Jelaskan sistem bilangan Biner, Desimal, dan Heksadesimal', materials)[0]?.material.title, 'Sistem Bilangan Komputer');
+  assert.equal(rankMaterialsForChat('Jelaskan Primary Key dan Foreign Key', materials)[0]?.material.title, 'Basis Data Relasional');
+  assert.equal(rankMaterialsForChat('Apa perbedaan for dan while?', materials)[0]?.material.title, 'Looping Python');
+  assert.equal(rankMaterialsForChat('Apa perbedaan pseudocode dan flowchart?', materials)[0]?.material.title, 'Berpikir Komputasional');
+  assert.equal(rankMaterialsForChat('Bagaimana menghitung host valid pada CIDR /26?', materials)[0]?.material.title, 'Subnetting Jaringan');
+});
+
+test('Cross-material questions may produce more than one relevant ranked source', () => {
+  const materials = [
+    { title: 'Berpikir Komputasional', category: 'Berpikir Komputasional', keywords: 'algoritma pseudocode flowchart', summary: 'Algoritma menyelesaikan masalah.', content: 'Langkah algoritma dapat diterapkan pada jaringan.' },
+    { title: 'Subnetting Jaringan', category: 'Jaringan Komputer', keywords: 'jaringan subnetting ip address algoritma', summary: 'Konfigurasi jaringan menggunakan subnet.', content: 'Algoritma pembagian subnet ditentukan oleh CIDR.' }
+  ];
+  const ranked = rankMaterialsForChat('Bagaimana penerapan algoritma dalam konfigurasi jaringan?', materials);
+  assert.ok(ranked.length >= 2);
+  assert.ok(ranked.every(item => item.score > 0));
+});
+
 test('Password hashing and PBKDF2 verification securely validates passwords', () => {
   const password = 'GuruInformatika2026!';
   const { hash, salt } = hashPassword(password);

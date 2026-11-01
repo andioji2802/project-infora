@@ -20,7 +20,7 @@ export function classifyChatIntent(text: string): ChatIntent {
 }
 
 function rankPublicContent(query: string, rows: any[], fields: string[]): any[] {
-  const stop = new Set(['apa', 'yang', 'untuk', 'dengan', 'tentang', 'bagaimana', 'cara', 'jelaskan', 'materi', 'soal', 'kuis', 'latihan', 'paket']);
+  const stop = new Set(['apa', 'yang', 'untuk', 'dengan', 'tentang', 'bagaimana', 'cara', 'jelaskan', 'materi', 'soal', 'kuis', 'latihan', 'paket', 'mulai', 'mau', 'nilai']);
   const words = normalizeQuery(query)
     .replace(/[^a-z0-9\s+-]/g, ' ')
     .split(/\s+/)
@@ -28,7 +28,11 @@ function rankPublicContent(query: string, rows: any[], fields: string[]): any[] 
   return rows.map(row => {
     const text = fields.map(field => String(row[field] || '')).join(' ').toLowerCase();
     let score = 0;
+    let matches = 0;
     for (const word of words) if (text.includes(word)) score += text.includes(word) ? 2 : 0;
+    for (const word of words) if (text.includes(word)) matches += 1;
+    const coverage = words.length ? matches / words.length : 0;
+    if (words.length > 0 && coverage < 0.4) return { row, score: 0 };
     return { row, score };
   }).filter(item => item.score > 0).sort((a, b) => b.score - a.score).map(item => item.row);
 }
@@ -37,7 +41,7 @@ const CHAT_STOP_WORDS = new Set([
   'apa', 'itu', 'ini', 'yang', 'untuk', 'dengan', 'tentang', 'bagaimana',
   'cara', 'jelaskan', 'materi', 'konsep', 'dasar', 'gimana', 'nih', 'dong',
   'sih', 'ya', 'bro', 'maksud', 'tolong', 'beri', 'berikan', 'kasih',
-  'data', 'basis', 'database', 'relasional', 'struktur', 'program', 'fungsi'
+  'struktur', 'program', 'dan', 'atau', 'perbedaan'
 ]);
 
 export function getChatTokens(text: string): string[] {
@@ -45,6 +49,33 @@ export function getChatTokens(text: string): string[] {
     .replace(/[^a-z0-9+\-\s]/g, ' ')
     .split(/\s+/)
     .filter(word => word.length > 2 && !CHAT_STOP_WORDS.has(word)))];
+}
+
+function contentVectorSimilarity(a: string, b: string): number {
+  const vectorize = (text: string) => {
+    const vector: Record<string, number> = {};
+    for (const word of normalizeQuery(text).replace(/[^a-z0-9+\-\s]/g, ' ').split(/\s+/).filter(Boolean)) {
+      let hash = 0;
+      for (let i = 0; i < word.length; i++) {
+        hash = ((hash << 5) - hash + word.charCodeAt(i)) | 0;
+      }
+      const key = String(Math.abs(hash) % 128);
+      vector[key] = (vector[key] || 0) + 1;
+    }
+    return vector;
+  };
+  const left = vectorize(a);
+  const right = vectorize(b);
+  let dot = 0;
+  let leftNorm = 0;
+  let rightNorm = 0;
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  for (const key of keys) {
+    dot += (left[key] || 0) * (right[key] || 0);
+    leftNorm += (left[key] || 0) ** 2;
+    rightNorm += (right[key] || 0) ** 2;
+  }
+  return leftNorm && rightNorm ? dot / Math.sqrt(leftNorm * rightNorm) : 0;
 }
 
 function getMaterialSearchText(material: any): string {
@@ -56,30 +87,51 @@ function getMaterialSearchText(material: any): string {
 }
 
 export function rankMaterialsForChat(message: string, materials: any[]): Array<{ material: any; score: number }> {
-  const tokens = getChatTokens(message);
+  const tokens = getChatTokens(message).filter(word => word.length >= 3);
   const languageTerms = [...message.toLowerCase().matchAll(/\b(javascript|typescript|python|java|php|c\+\+|sql)\b/g)]
     .map(match => match[1]);
   return materials.map(material => {
     const text = getMaterialSearchText(material);
-    const languageMismatch = languageTerms.some(language =>
-      !text.includes(language) &&
-      !getMaterialSearchText({ title: material.title, category: material.category, summary: material.summary, keywords: material.keywords }).includes(language)
-    );
+    const metadataText = [
+      material.title, material.category, material.summary,
+      material.keywords, material.aliases
+    ].filter(Boolean).join(' ').toLowerCase();
+    const languageMismatch = languageTerms.some(language => !metadataText.includes(language));
     if (languageMismatch) return { material, score: 0 };
     let score = 0;
     let strongMatches = 0;
-      for (const token of tokens) {
-      if (String(material.title || '').toLowerCase().includes(token)) { score += 8; strongMatches += 1; }
-      if (String(material.keywords || '').toLowerCase().includes(token)) { score += 6; strongMatches += 1; }
-      if (String(material.aliases || '').toLowerCase().includes(token)) { score += 5; strongMatches += 1; }
-      if (String(material.summary || '').toLowerCase().includes(token)) { score += 3; strongMatches += 1; }
-      if (String(material.content || '').toLowerCase().includes(token)) {
-        score += 1;
-      }
+    const titleText = String(material.title || '').toLowerCase();
+    const categoryText = String(material.category || '').toLowerCase();
+    const keywordText = `${material.keywords || ''} ${material.aliases || ''}`.toLowerCase();
+    const summaryText = String(material.summary || '').toLowerCase();
+    const contentText = String(material.content || '').toLowerCase();
+    for (const token of tokens) {
+      if (titleText.includes(token)) { score += 10; strongMatches += 1; }
+      if (keywordText.includes(token)) { score += 7; strongMatches += 1; }
+      if (summaryText.includes(token)) { score += 5; strongMatches += 1; }
+      if (categoryText.includes(token)) { score += 4; strongMatches += 1; }
+      if (text.includes(token)) score += 1;
     }
-    if (strongMatches === 0) return { material, score: 0 };
+    const normalizedQuery = tokens.join(' ');
+    if (normalizedQuery.length > 2 && metadataText.includes(normalizedQuery)) {
+      score += 12;
+      strongMatches += 1;
+    }
+    const semanticSimilarity = contentVectorSimilarity(tokens.join(' '), metadataText);
+    score += Math.round(semanticSimilarity * 8);
+    if (tokens.length > 0 && strongMatches === 0) return { material, score: 0 };
+    const metadataCoverage = tokens.length === 0
+      ? 0
+      : tokens.filter(token =>
+          titleText.includes(token) ||
+          keywordText.includes(token) ||
+          summaryText.includes(token) ||
+          categoryText.includes(token)
+        ).length / tokens.length;
+    if (metadataCoverage < 0.5 && strongMatches < 2) return { material, score: 0 };
+    if (score < 10) return { material, score: 0 };
     return { material, score };
-  }).filter(item => item.score >= 4).sort((a, b) => b.score - a.score);
+  }).filter(item => item.score > 0).sort((a, b) => b.score - a.score);
 }
 
 export function resolveChatQuery(message: string, history: Array<{ role: string; content: string }> = [], materials: any[] = []): string {
@@ -191,7 +243,7 @@ export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-  res.setHeader('X-INFORA-Chat-Version', 'f60de5e');
+  res.setHeader('X-INFORA-Chat-Version', 'chat-retrieval-audit-2026-11-01');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method tidak diizinkan.' });
   try {
@@ -200,10 +252,7 @@ export default async function handler(req: any, res: any) {
     if (!message) return res.status(400).json({ error: 'Pesan pertanyaan tidak boleh kosong.' });
     const scope = evaluateTopicScope(message);
     const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
-    const hasLearningHistory = history.some((item: any) =>
-      item?.role === 'assistant' && String(item?.content || '').length > 20
-    );
-    if (!scope.allowed && !(scope.reason === 'out_of_scope_no_informatics_context' && hasLearningHistory)) {
+    if (!scope.allowed) {
       return res.status(200).json({
         answer: EXACT_REFUSAL_MESSAGE,
         isRefusal: true,
@@ -348,7 +397,10 @@ export default async function handler(req: any, res: any) {
         sources: []
       });
     }
-    const strongestContexts = relevantContexts.slice(0, 1);
+    const topScore = relevantContexts[0].score;
+    const strongestContexts = relevantContexts
+      .filter(({ score }: any) => score >= topScore * 0.58)
+      .slice(0, 3);
     const context = strongestContexts.map(({ material }: any, index: number) => {
       const relevantSection = extractRelevantSections(material, resolvedMessage);
       return `SUMBER ${index + 1}: ${material.title}\nKategori: ${material.category}\nRingkasan: ${material.summary || ''}\nKUTIPAN RELEVAN:\n${relevantSection}`;
@@ -359,24 +411,6 @@ export default async function handler(req: any, res: any) {
       teacher_name: material.teacher_name || 'Guru Informatika',
       summary: material.summary
     }));
-
-    const primaryMaterial = strongestContexts[0].material;
-    const sourceContent = [
-      primaryMaterial.summary || '',
-      primaryMaterial.content || '',
-      primaryMaterial.examples || '',
-      primaryMaterial.practice_steps || '',
-      primaryMaterial.faq || ''
-    ].filter(Boolean).join('\n\n');
-
-    const definitionAnswer = buildDefinitionAnswer(message, primaryMaterial);
-    if (definitionAnswer) {
-      return res.status(200).json({
-        answer: definitionAnswer,
-        isRefusal: false,
-        sources
-      });
-    }
 
     const apiKey = process.env.GEMINI_API_KEY?.trim() || process.env.GEMINI_API_INFORA?.trim();
     if (!apiKey) {

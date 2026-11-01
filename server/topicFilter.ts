@@ -96,9 +96,11 @@ export function evaluateTopicScope(rawInput: string): ScopeCheckResult {
     return { allowed: true, reason: 'in_scope_keyword', normalizedText: normalized };
   }
 
-  // If asking a generic question without any technical/Informatika context, mark as out-of-scope
+  // Unknown subjects are not rejected here. Retrieval and available teacher
+  // materials must decide whether the question is answerable. This prevents
+  // a static keyword list from hiding newly uploaded subjects.
   if (!containsInformatikaKeyword && !isGreeting) {
-    return { allowed: false, reason: 'out_of_scope_no_informatics_context', normalizedText: normalized };
+    return { allowed: true, reason: 'relevance_validated_by_retrieval', normalizedText: normalized };
   }
 
   return { allowed: true, normalizedText: normalized };

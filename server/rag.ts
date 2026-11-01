@@ -197,7 +197,7 @@ export async function searchRelevantChunks(query: string, threshold = 0.28, limi
   const queryLower = normalizedQuery.toLowerCase();
   const explicitConcepts = ['kabel lan', 'crimping', 'rj45', 'rj-45', 'pembuatan kabel'];
   const matchedExplicitConcept = explicitConcepts.find(concept => queryLower.includes(concept));
-  const stopWords = new Set(['apa', 'yang', 'untuk', 'dengan', 'tentang', 'bagaimana', 'cara', 'buat', 'membuat', 'bantu', 'aku', 'jelaskan', 'perbedaan', 'itu', 'ini', 'sebuah', 'dari']);
+  const stopWords = new Set(['apa', 'yang', 'untuk', 'dengan', 'tentang', 'bagaimana', 'cara', 'buat', 'membuat', 'bantu', 'aku', 'jelaskan', 'perbedaan', 'itu', 'ini', 'sebuah', 'dari', 'dan', 'atau']);
   const queryWords = queryLower
     .replace(/[^a-z0-9+\s-]/g, ' ')
     .split(/\s+/)
@@ -206,6 +206,11 @@ export async function searchRelevantChunks(query: string, threshold = 0.28, limi
   const results: RetrievedChunkResult[] = [];
 
   for (const item of publishedChunks) {
+    const languageMatch = queryLower.match(/\b(javascript|typescript|python|java|php|c\+\+|sql)\b/g)?.[0];
+    if (languageMatch) {
+      const materialLanguages = `${item.material.title || ''} ${item.material.keywords || ''} ${item.material.summary || ''} ${item.material.content || ''}`.toLowerCase();
+      if (!materialLanguages.includes(languageMatch)) continue;
+    }
     let similarity = calculateCosineSimilarity(queryVector, item.chunk.embedding);
 
     const chunkLower = item.chunk.chunk_text.toLowerCase();
@@ -241,7 +246,7 @@ export async function searchRelevantChunks(query: string, threshold = 0.28, limi
 
     const hasSpecificTitleOrKeywordMatch =
       titleMatches > 0 ||
-      fieldKeywordMatches > 0 ||
+      fieldKeywordMatches >= Math.min(2, queryWords.length) ||
       summaryMatches >= Math.min(2, queryWords.length);
     const aggregateMaterialText =
       `${titleLower} ${summaryLower} ${keywordsLower} ${item.material.content || ''}`.toLowerCase();
@@ -380,45 +385,12 @@ export async function processStudentChat(
   history: ChatHistoryItem[] = []
 ): Promise<RAGAnswerResult> {
   const lowerMessage = userMessage.toLowerCase();
-  if (/\b(soal|latihan)\b/.test(lowerMessage) && /\bkuis\b/.test(lowerMessage)) {
-    const questions = db.getQuestions(true);
-    const quizzes = db.getQuizzes(true);
-    const parts: string[] = [];
-    if (questions.length) {
-      const question = questions[0];
-      const options = Array.isArray(question.options) ? question.options : [];
-      parts.push(`**Contoh soal terbitkan guru:**\n${question.question_text}${options.length ? '\n\n' + options.map((option, index) => `${String.fromCharCode(65 + index)}. ${option}`).join('\n') : ''}`);
-    } else {
-      parts.push('Guru belum menerbitkan bank soal untuk topik tersebut.');
-    }
-    if (quizzes.length) {
-      parts.push(`**Kuis yang tersedia:** ${quizzes[0].title}${quizzes[0].description ? `\n${quizzes[0].description}` : ''}`);
-    } else {
-      parts.push('Guru belum menerbitkan kuis untuk topik tersebut.');
-    }
-    return { answer: parts.join('\n\n'), isRefusal: false, sources: [] };
-  }
-  if (/^(contoh|berikan contoh|kasih contoh|bikin|buat)\b.*\b(soal|latihan)\b/i.test(userMessage)) {
-    const materials = db.getMaterials('published');
-    const keyword = normalizeQueryAliases(resolveConversationQuery(userMessage, history));
-    const material = materials.find(item =>
-      `${item.title} ${item.summary} ${item.keywords} ${item.category}`.toLowerCase()
-        .includes(keyword.split(/\s+/).find(word => word.length > 4 && !['contoh','soal','latihan'].includes(word)) || '')
-    ) || materials[0];
-    return {
-      answer: material
-        ? `Contoh soal dari materi **${material.title}**:\n\n1. Jelaskan konsep utama dari materi ini dengan kata-katamu sendiri.\n2. Berikan satu contoh penerapan dalam kehidupan sehari-hari atau praktik.\n3. Buat satu kasus singkat berdasarkan materi dan jelaskan langkah penyelesaiannya.`
-        : 'Guru belum memberikan materi untuk membuat contoh soal.',
-      isRefusal: !material,
-      sources: material ? [{ title: material.title, category: material.category, teacher_name: material.teacher_name || 'Guru Informatika', summary: material.summary }] : []
-    };
-  }
   if (/\b(kuis|latihan kuis|mulai kuis|paket kuis|nilai kuis)\b/.test(lowerMessage)) {
     const quizzes = db.getQuizzes(true);
     const matches = quizzes.filter(quiz =>
       `${quiz.title} ${quiz.description || ''} ${quiz.category}`.toLowerCase().includes(lowerMessage.replace(/[^a-z0-9\s]/g, ' ').trim().split(/\s+/).filter(word => word.length > 3).find(word => word && word !== 'kuis' && word !== 'latihan') || '')
     );
-    const quiz = matches[0] || quizzes[0];
+    const quiz = matches[0];
     if (!quiz) {
       return { answer: 'Guru belum menerbitkan paket kuis untuk topik tersebut.', isRefusal: true, sources: [] };
     }
@@ -481,7 +453,7 @@ export async function processStudentChat(
   }
 
   // Step 2: Retrieve relevant published chunks
-  const retrievedChunks = await searchRelevantChunks(resolvedQuery, 0.28, 12);
+  const retrievedChunks = await searchRelevantChunks(resolvedQuery, 0.38, 12);
 
   // If no sufficiently relevant published material is found:
   // Bagian 1: "Pertanyaan di luar cakupan pembelajaran harus mendapat satu kalimat penolakan yang sama persis."

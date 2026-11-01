@@ -16,7 +16,7 @@ export default async function handler(req: any, res: any) {
   if (getSupabaseConfig()) {
     const profile = await getSessionProfile(req);
     if (req.method === 'GET') {
-      const query = profile ? { select: '*', order: 'updated_at.desc' } : { status: 'eq.published', select: '*', order: 'updated_at.desc' };
+      const query: Record<string, string> = profile ? { select: '*', order: 'updated_at.desc' } : { status: 'eq.published', select: '*', order: 'updated_at.desc' };
       const result = await supabaseRequest('materials', { query });
       return res.status(result.status === 200 ? 200 : result.status).json(result.data);
     }
