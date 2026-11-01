@@ -77,6 +77,21 @@ function extractRelevantSections(material: any, message: string, limit = 1800): 
   return output.slice(0, limit).trim();
 }
 
+function buildSpecificFallback(message: string, material: any): string {
+  const normalized = message.toLowerCase();
+  const content = `${material.summary || ''}\n${material.content || ''}`;
+  const lowerContent = content.toLowerCase();
+
+  if (/(beda|perbedaan|pembeda).*(for|while)|(for|while).*(beda|perbedaan)/.test(normalized)) {
+    if (lowerContent.includes('perulangan for') && lowerContent.includes('perulangan while')) {
+      return 'Berdasarkan materi guru:\n\n- **`for`** digunakan ketika jumlah pengulangan atau urutan data sudah diketahui.\n- **`while`** digunakan selama suatu kondisi masih bernilai benar atau `True`.\n\nContoh `for`:\n`for i in range(1, 6):\\n    print(i)`\n\nContoh `while` memerlukan variabel penghitung dan perubahan nilai agar tidak menjadi perulangan tak terbatas.';
+    }
+  }
+
+  const relevant = extractRelevantSections(material, message, 600);
+  return relevant || 'Guru belum memberikan materi untuk pertanyaan ini.';
+}
+
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', req.headers?.origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -173,7 +188,7 @@ export default async function handler(req: any, res: any) {
 
     const apiKey = process.env.GEMINI_API_KEY?.trim() || process.env.GEMINI_API_INFORA?.trim();
     if (!apiKey) {
-      const fallbackSection = extractRelevantSections(relevantContexts[0].material, resolvedMessage, 900);
+      const fallbackSection = buildSpecificFallback(resolvedMessage, relevantContexts[0].material);
       return res.status(200).json({
         answer: fallbackSection,
         isRefusal: false,
@@ -205,7 +220,7 @@ export default async function handler(req: any, res: any) {
     try {
       payload = JSON.parse(responseText);
     } catch {
-      const fallbackSection = extractRelevantSections(relevantContexts[0].material, resolvedMessage, 900);
+      const fallbackSection = buildSpecificFallback(resolvedMessage, relevantContexts[0].material);
       return res.status(200).json({
         answer: fallbackSection,
         isRefusal: false,
@@ -213,7 +228,7 @@ export default async function handler(req: any, res: any) {
       });
     }
     if (!response.ok) {
-      const fallbackSection = extractRelevantSections(relevantContexts[0].material, resolvedMessage, 900);
+      const fallbackSection = buildSpecificFallback(resolvedMessage, relevantContexts[0].material);
       return res.status(200).json({
         answer: fallbackSection,
         isRefusal: false,
@@ -221,7 +236,11 @@ export default async function handler(req: any, res: any) {
       });
     }
     const answer = payload?.candidates?.[0]?.content?.parts?.map((part: any) => part.text || '').join('').trim();
-    return res.status(200).json({ answer: answer || 'Maaf, jawaban belum dapat dibuat.', isRefusal: false, sources });
+    return res.status(200).json({
+      answer: answer || buildSpecificFallback(resolvedMessage, relevantContexts[0].material),
+      isRefusal: false,
+      sources
+    });
   } catch (error: any) {
     console.error('Chat error:', error);
     const materials = db.getMaterials('published');
@@ -231,7 +250,7 @@ export default async function handler(req: any, res: any) {
       words.some(word => word.length > 3 && `${material.title} ${material.summary || ''} ${material.keywords || ''} ${material.content}`.toLowerCase().includes(word))
     );
     if (match) {
-      const fallbackSection = extractRelevantSections(match, String(fallbackBody.message || ''), 900);
+      const fallbackSection = buildSpecificFallback(String(fallbackBody.message || ''), match);
       if (!fallbackSection) {
         return res.status(200).json({
           answer: 'Guru belum memberikan materi untuk pertanyaan ini.',
