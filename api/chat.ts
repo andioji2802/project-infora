@@ -82,10 +82,33 @@ function buildSpecificFallback(message: string, material: any): string {
   const content = `${material.summary || ''}\n${material.content || ''}`;
   const lowerContent = content.toLowerCase();
 
+  if (/contoh.*(kodenya|for|while)|^(bagaimana|berikan).*kode/.test(normalized)) {
+    if (lowerContent.includes('perulangan for') && lowerContent.includes('perulangan while')) {
+      return 'Berdasarkan materi guru:\n\n**Contoh `for`:**\n```python\nfor i in range(1, 6):\n    print(i)\n```\n\n**Contoh `while`:**\n```python\ni = 1\nwhile i <= 3:\n    print("Halo!")\n    i += 1\n```';
+    }
+  }
+
   if (/(beda|perbedaan|pembeda).*(for|while)|(for|while).*(beda|perbedaan)/.test(normalized)) {
     if (lowerContent.includes('perulangan for') && lowerContent.includes('perulangan while')) {
-      return 'Berdasarkan materi guru:\n\n- **`for`** digunakan ketika jumlah pengulangan atau urutan data sudah diketahui.\n- **`while`** digunakan selama suatu kondisi masih bernilai benar atau `True`.\n\nContoh `for`:\n`for i in range(1, 6):\\n    print(i)`\n\nContoh `while` memerlukan variabel penghitung dan perubahan nilai agar tidak menjadi perulangan tak terbatas.';
+      return 'Berdasarkan materi guru:\n\n- **`for`** digunakan ketika jumlah pengulangan atau urutan data sudah diketahui.\n- **`while`** digunakan selama suatu kondisi masih bernilai benar atau `True`.\n\nContoh `for`:\n```python\nfor i in range(1, 6):\n    print(i)\n```\n\nContoh `while`:\n```python\ni = 1\nwhile i <= 3:\n    print("Halo!")\n    i += 1\n```';
     }
+  }
+
+  if (/contoh.*(for|while)|^(bagaimana|berikan).*kode/.test(normalized)) {
+    if (lowerContent.includes('perulangan for') && lowerContent.includes('perulangan while')) {
+      return 'Berdasarkan materi guru:\n\n**Contoh `for`:**\n```python\nfor i in range(1, 6):\n    print(i)\n```\n\n**Contoh `while`:**\n```python\ni = 1\nwhile i <= 3:\n    print(\"Halo!\")\n    i += 1\n```';
+    }
+  }
+
+  if (/continue/.test(normalized) && lowerContent.includes('continue')) {
+    if (/break/.test(normalized) && lowerContent.includes('break')) {
+      return 'Berdasarkan materi guru:\n\n- **`break`** menghentikan perulangan secara langsung meskipun kondisi masih bisa berlanjut.\n- **`continue`** melewati satu putaran perulangan dan melanjutkan ke putaran berikutnya.';
+    }
+    return 'Berdasarkan materi guru, `continue` digunakan untuk **melewati satu putaran perulangan** dan melanjutkan ke putaran berikutnya tanpa mengakhiri seluruh perulangan.';
+  }
+
+  if (/break/.test(normalized) && lowerContent.includes('break')) {
+    return 'Berdasarkan materi guru, `break` digunakan untuk **menghentikan perulangan secara langsung**, meskipun kondisi perulangan sebenarnya masih dapat berlanjut.';
   }
 
   const relevant = extractRelevantSections(material, message, 600);
@@ -111,10 +134,11 @@ export default async function handler(req: any, res: any) {
     const stopWords = new Set(['apa','yang','untuk','dengan','tentang','bagaimana','cara','jelaskan','perbedaan','dan','atau','materi','konsep','dasar','contoh','kode','itu','ini']);
     const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
     const lastUserQuestion = [...history].reverse().find((item: any) => item?.role === 'user' && typeof item.content === 'string')?.content;
-    const queryTopic = detectTopic(normalizeQuery(message));
-    const resolvedMessage = queryTopic || message.split(/\s+/).length >= 4
-      ? message
-      : `${lastUserQuestion ? `${lastUserQuestion}\n` : ''}${message}`;
+    const isFollowUp = /^(bagaimana|berikan|berikan contoh|tampilkan|apa itu|apa maksud|jelaskan|lanjutkan|dan|apa contoh|contoh)/i.test(message)
+      || message.split(/\s+/).length <= 3;
+    const resolvedMessage = isFollowUp && lastUserQuestion
+      ? `${lastUserQuestion}\n${message}`
+      : message || '';
     const normalizedMessage = normalizeQuery(resolvedMessage);
     const words: string[] = normalizedMessage.replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/).filter((w: string) => w.length > 2 && !stopWords.has(w));
     const resolvedTopic = detectTopic(normalizedMessage);
