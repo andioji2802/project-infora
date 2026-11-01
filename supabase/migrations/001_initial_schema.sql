@@ -8,7 +8,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 -- 2. Profiles Table (Teacher profiles linked to Supabase Auth)
 CREATE TABLE IF NOT EXISTS public.profiles (
-    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY,
     full_name TEXT NOT NULL,
     school_name TEXT,
     teacher_identifier TEXT,
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS public.materials (
     examples TEXT,
     practice_steps TEXT,
     faq TEXT,
-    references TEXT,
+    "references" TEXT,
     status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
