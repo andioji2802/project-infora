@@ -155,6 +155,7 @@ test('Generic conversation resolver isolates explicit new material topics', () =
   ];
 
   assert.equal(resolveChatQuery('Apa itu stomata?', history, materials), 'Apa itu stomata?');
+  assert.equal(resolveChatQuery('Apa itu fotosintesis?', history, materials), 'Apa itu fotosintesis?');
   assert.match(resolveChatQuery('lanjutkan penjelasannya', history, materials), /Apa bedanya for dan while\?/i);
 });
 

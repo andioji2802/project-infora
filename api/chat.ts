@@ -71,6 +71,10 @@ export function rankMaterialsForChat(message: string, materials: any[]): Array<{
 
 export function resolveChatQuery(message: string, history: Array<{ role: string; content: string }> = [], materials: any[] = []): string {
   const latest = message.trim();
+  if (/^(lalu\s+)?(apa itu|apa sih|apa arti)\b/i.test(latest) ||
+      /\bitu apa\b/i.test(latest)) {
+    return latest;
+  }
   const recentUsers = history.filter(item => item.role === 'user').map(item => item.content.trim()).filter(Boolean).slice(-2);
   const explicitMaterial = materials.find(material => {
     const tokens = getChatTokens(latest);
@@ -114,7 +118,7 @@ function extractRelevantSections(material: any, message: string, limit = 1800): 
       if (/^#{1,4}\s/.test(block) && lower.includes(token)) score += 8;
     });
     return { block, score };
-  }).filter(item => item.score > 0).sort((a, b) => b.score - a.score);
+  }).filter(item => item.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
 
   let output = '';
   for (const item of ranked) {
