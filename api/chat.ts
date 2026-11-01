@@ -86,7 +86,7 @@ function getMaterialSearchText(material: any): string {
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
-export function rankMaterialsForChat(message: string, materials: any[]): Array<{ material: any; score: number }> {
+export function rankMaterialsForChat(message: string, materials: any[]): Array<{ material: any; score: number; keywordScore: number; semanticScore: number }> {
   const tokens = getChatTokens(message).filter(word => word.length >= 3);
   const languageTerms = [...message.toLowerCase().matchAll(/\b(javascript|typescript|python|java|php|c\+\+|sql)\b/g)]
     .map(match => match[1]);
@@ -96,30 +96,32 @@ export function rankMaterialsForChat(message: string, materials: any[]): Array<{
       material.title, material.category, material.summary,
       material.keywords, material.aliases
     ].filter(Boolean).join(' ').toLowerCase();
-    const languageMismatch = languageTerms.some(language => !metadataText.includes(language));
-    if (languageMismatch) return { material, score: 0 };
+    const languageMismatch = languageTerms.some(language => !text.includes(language));
+    if (languageMismatch) return { material, score: 0, keywordScore: 0, semanticScore: 0 };
     let score = 0;
     let strongMatches = 0;
+    let keywordScore = 0;
+    let semanticScore = 0;
     const titleText = String(material.title || '').toLowerCase();
     const categoryText = String(material.category || '').toLowerCase();
     const keywordText = `${material.keywords || ''} ${material.aliases || ''}`.toLowerCase();
     const summaryText = String(material.summary || '').toLowerCase();
     const contentText = String(material.content || '').toLowerCase();
     for (const token of tokens) {
-      if (titleText.includes(token)) { score += 10; strongMatches += 1; }
-      if (keywordText.includes(token)) { score += 7; strongMatches += 1; }
-      if (summaryText.includes(token)) { score += 5; strongMatches += 1; }
-      if (categoryText.includes(token)) { score += 4; strongMatches += 1; }
-      if (text.includes(token)) score += 1;
+      if (titleText.includes(token)) { score += 10; keywordScore += 10; strongMatches += 1; }
+      if (keywordText.includes(token)) { score += 7; keywordScore += 7; strongMatches += 1; }
+      if (summaryText.includes(token)) { score += 5; keywordScore += 5; strongMatches += 1; }
+      if (categoryText.includes(token)) { score += 4; keywordScore += 4; strongMatches += 1; }
+      if (text.includes(token)) { score += 1; keywordScore += 1; }
     }
     const normalizedQuery = tokens.join(' ');
     if (normalizedQuery.length > 2 && metadataText.includes(normalizedQuery)) {
       score += 12;
       strongMatches += 1;
     }
-    const semanticSimilarity = contentVectorSimilarity(tokens.join(' '), metadataText);
+    const semanticSimilarity = contentVectorSimilarity(tokens.join(' '), getMaterialSearchText(material));
+    semanticScore = Math.round(semanticSimilarity * 8);
     score += Math.round(semanticSimilarity * 8);
-    if (tokens.length > 0 && strongMatches === 0) return { material, score: 0 };
     const metadataCoverage = tokens.length === 0
       ? 0
       : tokens.filter(token =>
@@ -128,9 +130,16 @@ export function rankMaterialsForChat(message: string, materials: any[]): Array<{
           summaryText.includes(token) ||
           categoryText.includes(token)
         ).length / tokens.length;
-    if (metadataCoverage < 0.5 && strongMatches < 2) return { material, score: 0 };
-    if (score < 10) return { material, score: 0 };
-    return { material, score };
+    const contentCoverage = tokens.length === 0
+      ? 0
+      : tokens.filter(token => contentText.includes(token)).length / tokens.length;
+    if (contentCoverage >= 0.25) {
+      score += 12;
+      strongMatches += 1;
+    }
+    if (metadataCoverage < 0.5 && contentCoverage < 0.25 && strongMatches < 2) return { material, score: 0, keywordScore: 0, semanticScore: 0 };
+    if (score < 10) return { material, score: 0, keywordScore: 0, semanticScore: 0 };
+    return { material, score, keywordScore, semanticScore: Math.round(semanticSimilarity * 8) };
   }).filter(item => item.score > 0).sort((a, b) => b.score - a.score);
 }
 
@@ -196,6 +205,14 @@ export function extractRelevantSections(material: any, message: string, limit = 
       break;
     }
     output += `${output ? '\n\n' : ''}${item.block}`;
+  }
+  if (!output.trim()) {
+    const contentCoverage = tokens.length === 0
+      ? 0
+      : tokens.filter(token => source.toLowerCase().includes(token)).length / tokens.length;
+    if (contentCoverage >= 0.5) {
+      output = source.slice(0, limit).trim();
+    }
   }
   return output.slice(0, limit).trim();
 }
@@ -411,6 +428,29 @@ export default async function handler(req: any, res: any) {
       teacher_name: material.teacher_name || 'Guru Informatika',
       summary: material.summary
     }));
+    console.info('INFORA_RAG_DIAGNOSTIC', JSON.stringify({
+      originalQuestion: message,
+      resolvedQuestion: resolvedMessage,
+      candidates: scored.map((item: any) => ({
+        id: item.material.id || null,
+        title: item.material.title,
+        status: item.material.status || 'published',
+        category: item.material.category,
+        keywordScore: item.keywordScore,
+        semanticScore: item.semanticScore,
+        rankingScore: item.score
+      })),
+      selectedSources: strongestContexts.map(({ material, score, keywordScore, semanticScore }: any) => ({
+        id: material.id || null,
+        title: material.title,
+        status: material.status || 'published',
+        category: material.category,
+        rankingScore: score,
+        keywordScore,
+        semanticScore,
+        sentChunks: extractRelevantSections(material, resolvedMessage)
+      }))
+    }));
 
     const apiKey = process.env.GEMINI_API_KEY?.trim() || process.env.GEMINI_API_INFORA?.trim();
     if (!apiKey) {
@@ -462,6 +502,11 @@ export default async function handler(req: any, res: any) {
       });
     }
     const answer = payload?.candidates?.[0]?.content?.parts?.map((part: any) => part.text || '').join('').trim();
+    console.info('INFORA_GEMINI_DIAGNOSTIC', JSON.stringify({
+      originalQuestion: message,
+      sentSources: sources.map((source: any) => source.title),
+      answer: answer || ''
+    }));
     return res.status(200).json({
       answer: answer || buildSpecificFallback(resolvedMessage, relevantContexts[0].material),
       isRefusal: false,

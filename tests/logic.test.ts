@@ -144,6 +144,30 @@ test('Generic retrieval ranks a newly uploaded material without topic-specific c
   assert.equal(ranked[0].material.title, 'Fotosintesis dan Reaksi Cahaya');
 });
 
+test('Live coding material answers web developer and mobile developer without keyword-only fallback', () => {
+  const coding = {
+    id: 'coding-live',
+    title: 'Pengenalan Coding dan Dasar-Dasar Pemrograman dengan Python',
+    category: 'Pemrograman',
+    summary: 'Materi pengenalan coding untuk siswa SMK.',
+    content: 'Web Developer membuat dan mengembangkan website. Mobile Developer membuat aplikasi perangkat seluler. Bahasa yang sering digunakan meliputi Python, JavaScript, Java, dan C++.'
+  };
+
+  const web = rankMaterialsForChat('Siapa pembuat website?', [coding]);
+  assert.equal(web[0]?.material.id, 'coding-live');
+  assert.match(extractRelevantSections(coding, 'Siapa pembuat website?'), /Web Developer|website/i);
+
+  const mobile = rankMaterialsForChat('Apa itu mobile developer?', [coding]);
+  assert.equal(mobile[0]?.material.id, 'coding-live');
+  assert.match(extractRelevantSections(coding, 'Apa itu mobile developer?'), /Mobile Developer|perangkat seluler/i);
+
+  const languages = extractRelevantSections(coding, 'Bahasa pemrograman yang sering digunakan?');
+  assert.match(languages, /Python/i);
+  assert.match(languages, /JavaScript/i);
+  assert.match(languages, /Java/i);
+  assert.match(languages, /C\+\+/i);
+});
+
 test('Generic conversation resolver isolates explicit new material topics', () => {
   const materials = [
     { title: 'Looping Python', category: 'Pemrograman', keywords: 'for while range' },

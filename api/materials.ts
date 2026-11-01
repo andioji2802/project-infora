@@ -3,6 +3,54 @@ import { getSupabaseConfig, supabaseRequest } from '../server/supabase.js';
 import { getSessionProfile } from '../server/auth.js';
 import { parseRequestBody } from '../server/http.js';
 
+function chunkMaterialText(material: any): string[] {
+  const source = [
+    `Judul: ${material.title || ''}`,
+    `Kategori: ${material.category || ''}`,
+    material.summary || '',
+    material.learning_objectives || '',
+    material.content || '',
+    material.examples || '',
+    material.practice_steps || '',
+    material.faq || '',
+    material.keywords || '',
+    material.aliases || ''
+  ].filter(Boolean).join('\n\n');
+  const chunks: string[] = [];
+  const paragraphs = source.split(/\n\s*\n/);
+  let current = '';
+  for (const paragraph of paragraphs) {
+    if ((current + '\n\n' + paragraph).length > 1200 && current) {
+      chunks.push(current.trim());
+      current = paragraph;
+    } else {
+      current += `${current ? '\n\n' : ''}${paragraph}`;
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
+  return chunks;
+}
+
+async function synchronizeMaterialChunks(material: any): Promise<void> {
+  if (!material?.id) return;
+  await supabaseRequest('material_chunks', {
+    method: 'DELETE',
+    query: { material_id: `eq.${material.id}` }
+  });
+  if (material.status !== 'published') return;
+  const chunks = chunkMaterialText(material);
+  if (chunks.length === 0) return;
+  await supabaseRequest('material_chunks', {
+    method: 'POST',
+    body: chunks.map((chunk_text, chunk_index) => ({
+      material_id: material.id,
+      chunk_index,
+      chunk_text,
+      embedding: null
+    }))
+  });
+}
+
 function teacher(req: any) {
   const auth = req.headers?.authorization || '';
   return auth.startsWith('Bearer ') ? db.getUserFromSession(auth.slice(7)) : null;
@@ -40,10 +88,14 @@ export default async function handler(req: any, res: any) {
       };
       if (req.method === 'PUT') {
         const result = await supabaseRequest('materials', { method: 'PATCH', query: { id: `eq.${id}`, owner_id: `eq.${profile.id}` }, body: payload });
-        return res.status(result.status).json(result.data[0] || { error: 'Materi tidak ditemukan.' });
+        const saved = result.data?.[0];
+        if (saved) await synchronizeMaterialChunks(saved);
+        return res.status(result.status).json(saved || { error: 'Materi tidak ditemukan.' });
       }
       const result = await supabaseRequest('materials', { method: 'POST', body: payload });
-      return res.status(result.status === 201 ? 201 : result.status).json(result.data[0] || { error: 'Gagal menyimpan materi.' });
+      const saved = result.data?.[0];
+      if (saved) await synchronizeMaterialChunks(saved);
+      return res.status(result.status === 201 ? 201 : result.status).json(saved || { error: 'Gagal menyimpan materi.' });
     }
     return res.status(405).json({ error: 'Method tidak diizinkan.' });
   }
