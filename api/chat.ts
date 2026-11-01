@@ -361,6 +361,28 @@ export default async function handler(req: any, res: any) {
       .trim()
       .replace(/\s+(bro|sih|dong|nih|ya|tolong)$/i, '')
       .trim();
+    if (/^(?:apa itu range|range itu apa|range tuh apa)(?: ya)?\??$/i.test(normalizedDefinitionRequest)) {
+      const loopingMaterial = materials.find((material: any) =>
+        /\b(range|for|while|perulangan|looping)\b/i.test(`${material.title || ''} ${material.summary || ''} ${material.keywords || ''} ${material.content || ''}`)
+      );
+      if (loopingMaterial) {
+        const rangeExample = `${loopingMaterial.summary || ''}\n${loopingMaterial.content || ''}\n${loopingMaterial.examples || ''}`
+          .split(/\n\s*\n/)
+          .map((item: string) => item.replace(/\s+/g, ' ').trim())
+          .find((item: string) => /\brange\s*\(/i.test(item));
+        return res.status(200).json({
+          answer: 'Berdasarkan materi guru, `range()` digunakan pada perulangan `for` untuk membuat urutan angka yang akan diproses.' +
+            (rangeExample ? `\n\nContoh yang diberikan guru:\n\`\`\`python\n${rangeExample}\n\`\`\`` : ''),
+          isRefusal: false,
+          sources: [{
+            title: loopingMaterial.title,
+            category: loopingMaterial.category,
+            teacher_name: loopingMaterial.teacher_name || 'Guru Informatika',
+            summary: loopingMaterial.summary
+          }]
+        });
+      }
+    }
     if (/^(lalu\s+)?(apa itu|apa sih|apa arti)\s+subnetting\??$/i.test(normalizedDefinitionRequest) ||
         /^subnetting itu apa\??$/i.test(normalizedDefinitionRequest) ||
         /\b(apa itu|apa sih|apa arti|itu apa)\b/i.test(normalizedDefinitionRequest) && /\bsubnetting\b/i.test(normalizedDefinitionRequest)) {
