@@ -262,7 +262,6 @@ export async function searchRelevantChunks(query: string, threshold = 0.28, limi
     if (
       similarity >= threshold &&
       hasMeaningfulCoverage &&
-      hasSpecificTitleOrKeywordMatch &&
       hasExplicitConceptInMaterial
     ) {
       results.push({
