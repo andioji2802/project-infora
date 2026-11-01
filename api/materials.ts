@@ -2,6 +2,7 @@ import { db } from '../server/db.js';
 import { getSupabaseConfig, supabaseRequest } from '../server/supabase.js';
 import { getSessionProfile } from '../server/auth.js';
 import { parseRequestBody } from '../server/http.js';
+import { createEmbeddingVector } from '../server/ai.js';
 
 function chunkMaterialText(material: any): string[] {
   const source = [
@@ -42,12 +43,13 @@ async function synchronizeMaterialChunks(material: any): Promise<void> {
   if (chunks.length === 0) return;
   await supabaseRequest('material_chunks', {
     method: 'POST',
-    body: chunks.map((chunk_text, chunk_index) => ({
+    body: await Promise.all(chunks.map(async (chunk_text, chunk_index) => ({
       material_id: material.id,
       chunk_index,
       chunk_text,
-      embedding: null
-    }))
+      embedding: await createEmbeddingVector(chunk_text),
+      embedding_model: 'gemini-embedding-2-preview'
+    })))
   });
 }
 

@@ -30,8 +30,8 @@ const STRICTLY_PROHIBITED_PATTERNS = [
   /\b(gosip|artis|selebriti|sinetron|drakor|film|bioskop|lagu pop|lagu)\b/i,
   /\b(ramalan|zodiak|horoskop|shio|dukun|santet)\b/i,
   /\b(judi|slot|togel|taruhan)\b/i,
-  /\b(resep masakan|cara memasak|baju lebaran|skincare|makeup)\b/i,
-  /\b(politik praktis|pilpres|pemilu|kampanye partai)\b/i
+  /\b(resep masakan|cara memasak|baju lebaran|skincare|makeup|mi instan|mie instan|membuat kue|cara membuat kue)\b/i,
+  /\b(politik praktis|pilpres|pemilu|kampanye partai|presiden indonesia)\b/i
 ];
 
 // Adversarial prompt injection patterns

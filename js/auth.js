@@ -14,10 +14,6 @@ export function setAuthToken(token) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
-export function clearAuthToken() {
-  localStorage.removeItem(TOKEN_KEY);
-}
-
 export async function loginTeacher(nip, password) {
   const res = await fetch(apiUrl('/api/auth-login'), {
     method: 'POST',
@@ -49,7 +45,7 @@ export async function getCurrentTeacher() {
   if (!token) return null;
   try {
     const res = await fetch(apiUrl('/api/auth-me'), {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: 'Bearer ' + token }
     });
     if (!res.ok) {
       clearAuthToken();
@@ -68,7 +64,7 @@ export async function logoutTeacher() {
   if (token) {
     await fetch(apiUrl('/api/auth-logout'), {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: 'Bearer ' + token }
     }).catch(() => {});
   }
   clearAuthToken();

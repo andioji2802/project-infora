@@ -15,7 +15,7 @@ export default async function handler(req: any, res: any) {
     });
     if (!sessions.data.length) return res.status(401).json({ error: 'Sesi login tidak valid.' });
     const userId = sessions.data[0].user_id;
-    await supabaseRequest('profiles', {
+    const update = await supabaseRequest('profiles', {
       method: 'PATCH',
       query: { id: `eq.${userId}` },
       body: {
@@ -24,6 +24,9 @@ export default async function handler(req: any, res: any) {
         teacher_identifier: body.teacher_identifier
       }
     });
+    if (update.error || update.status < 200 || update.status >= 300) {
+      return res.status(update.status || 500).json({ error: update.error || 'Gagal menyimpan profil.' });
+    }
     const profiles = await supabaseRequest('profiles', { query: { id: `eq.${userId}`, select: '*' } });
     if (!profiles.data.length) return res.status(404).json({ error: 'Profil tidak ditemukan.' });
     const { password_hash, password_salt, ...user } = profiles.data[0];

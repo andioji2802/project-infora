@@ -61,7 +61,30 @@ export async function generateGeminiResponse(systemInstruction: string, prompt: 
  * Compatible with pgvector cosine distance operations
  */
 export async function createEmbeddingVector(text: string): Promise<number[]> {
-  return generateDeterministicFallbackVector(text);
+  try {
+    const apiKey =
+      process.env.GEMINI_API_KEY?.trim() ||
+      process.env.GEMINI_API_INFORA?.trim();
+    if (!apiKey || !text.trim()) return generateDeterministicFallbackVector(text, 768);
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(EMBEDDING_MODEL_NAME)}:embedContent?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: `models/${EMBEDDING_MODEL_NAME}`,
+          content: { parts: [{ text }] }
+        }),
+        signal: AbortSignal.timeout(15000)
+      }
+    );
+    if (!response.ok) return generateDeterministicFallbackVector(text, 768);
+    const payload: any = await response.json();
+    const values = payload?.embedding?.values;
+    return Array.isArray(values) && values.length === 768 ? values : generateDeterministicFallbackVector(text, 768);
+  } catch {
+    return generateDeterministicFallbackVector(text, 768);
+  }
 }
 
 /**

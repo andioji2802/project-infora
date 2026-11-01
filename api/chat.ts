@@ -276,6 +276,13 @@ export default async function handler(req: any, res: any) {
         sources: []
       });
     }
+    if (/^(hai|halo|hi|hello|selamat pagi|selamat siang|selamat sore|selamat malam)[!.\s]*$/i.test(message)) {
+      return res.status(200).json({
+        answer: 'Halo! Silakan tanyakan materi Informatika yang ingin kamu pahami, misalnya coding, jaringan, basis data, algoritma, atau sistem komputer.',
+        isRefusal: false,
+        sources: []
+      });
+    }
 
     let materials: any[] = db.getMaterials('published');
     if (getSupabaseConfig()) {

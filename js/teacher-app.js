@@ -57,6 +57,29 @@ class TeacherApp {
     const tabRegister = document.getElementById('tab-btn-register');
     const formLogin = document.getElementById('form-login');
     const formRegister = document.getElementById('form-register');
+    const forgotButton = document.getElementById('btn-forgot-password');
+
+    if (forgotButton) {
+      forgotButton.addEventListener('click', async () => {
+        const identifier = window.prompt('Masukkan email atau NIP/ID guru yang terdaftar:');
+        if (!identifier?.trim()) return;
+        forgotButton.disabled = true;
+        try {
+          const res = await fetch(apiUrl('/api/auth-reset'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+            body: JSON.stringify(identifier.includes('@') ? { email: identifier.trim() } : { nip: identifier.trim() })
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || 'Permintaan reset gagal.');
+          window.alert(`Kata sandi sementara: ${data.temporaryPassword}\nSegera ubah setelah masuk.`);
+        } catch (err) {
+          showToast(err.message, 'error');
+        } finally {
+          forgotButton.disabled = false;
+        }
+      });
+    }
 
     document.querySelectorAll('.password-toggle').forEach(button => {
       button.addEventListener('click', () => {
@@ -321,7 +344,7 @@ class TeacherApp {
     try {
       const token = getAuthToken();
       const res = await fetch(apiUrl('/api/stats'), {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': 'Bearer ' + token },
       });
       if (res.ok) {
         const stats = await res.json();
@@ -364,7 +387,7 @@ class TeacherApp {
         method: 'PUT',
         headers: {
           'Content-Type': 'text/plain;charset=UTF-8',
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         },
         body: JSON.stringify(payload)
       });
@@ -394,15 +417,15 @@ class TeacherApp {
         <div style="display:flex; flex-direction:column; gap:12px;">
           <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; background:var(--color-surface); border-radius:var(--radius-md);">
             <span>Model Generatif AI (Tutor):</span>
-            <span class="badge badge-published">Gemini 3.8 Flash (Aktif)</span>
+            <span class="badge badge-published">${escapeHtml(health.hasGeminiKey ? `${health.model || 'Gemini 2.5 Flash'} (Aktif)` : 'API Key Belum Dikonfigurasi')}</span>
           </div>
           <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; background:var(--color-surface); border-radius:var(--radius-md);">
             <span>Model Vektor Embedding:</span>
-            <span class="badge badge-published">gemini-embedding-2-preview (Multilingual)</span>
+            <span class="badge badge-published">${escapeHtml(health.embeddingModel || 'gemini-embedding-2-preview')} (Multilingual)</span>
           </div>
           <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; background:var(--color-surface); border-radius:var(--radius-md);">
             <span>Penyimpanan Vektor (pgvector/Database):</span>
-            <span class="badge badge-published">Terhubung (${health.totalChunks || 0} Chunks Tersimpan)</span>
+            <span class="badge ${health.hasSupabase ? 'badge-published' : 'badge-draft'}">${health.hasSupabase ? `Terhubung (${health.totalChunks || 0} Chunks Tersimpan)` : 'Mode Lokal / Supabase Belum Dikonfigurasi'}</span>
           </div>
           <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; background:var(--color-surface); border-radius:var(--radius-md);">
             <span>Filter Topik SMK:</span>
