@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { evaluateTopicScope, EXACT_REFUSAL_MESSAGE } from '../server/topicFilter.js';
 import { calculateCosineSimilarity, chunkMaterialContent, resolveConversationQuery, buildContextualFollowups } from '../server/rag.js';
 import { hashPassword, verifyPassword, MaterialItem } from '../server/db.js';
+import { classifyChatIntent, rankMaterialsForChat, resolveChatQuery } from '../api/chat.js';
 
 test('Topic Filter allows valid SMK Informatika curriculum questions', () => {
   const q1 = evaluateTopicScope('Apa itu subnetting IP Address dan bagaimana cara menghitung host valid?');
@@ -131,6 +132,36 @@ test('Material chunking preserves content and splits by semantic headers', () =>
   const chunks = chunkMaterialContent(dummyMaterial);
   assert.ok(chunks.length >= 1);
   assert.ok(chunks.some(c => c.includes('Bagian 1') || c.includes('Testing Jaringan')));
+});
+
+test('Generic retrieval ranks a newly uploaded material without topic-specific code', () => {
+  const materials = [
+    { title: 'Looping Python', category: 'Pemrograman', keywords: 'for while range', summary: 'Perulangan dalam Python.', content: '### Penjelasan Loop\nLoop mengulang instruksi.' },
+    { title: 'Fotosintesis dan Reaksi Cahaya', category: 'Biologi', keywords: 'klorofil stomata fotofosforilasi', summary: 'Fotosintesis mengubah cahaya menjadi energi kimia.', content: '### Reaksi Gelap\nKarbondioksida direduksi menjadi glukosa.' }
+  ];
+
+  const ranked = rankMaterialsForChat('Apa fungsi stomata pada fotosintesis?', materials);
+  assert.equal(ranked[0].material.title, 'Fotosintesis dan Reaksi Cahaya');
+});
+
+test('Generic conversation resolver isolates explicit new material topics', () => {
+  const materials = [
+    { title: 'Looping Python', category: 'Pemrograman', keywords: 'for while range' },
+    { title: 'Fotosintesis dan Reaksi Cahaya', category: 'Biologi', keywords: 'klorofil stomata fotosintesis' }
+  ];
+  const history = [
+    { role: 'user', content: 'Apa bedanya for dan while?' },
+    { role: 'assistant', content: 'for dan while digunakan untuk perulangan.' }
+  ];
+
+  assert.equal(resolveChatQuery('Apa itu stomata?', history, materials), 'Apa itu stomata?');
+  assert.match(resolveChatQuery('lanjutkan penjelasannya', history, materials), /Apa bedanya for dan while\?/i);
+});
+
+test('Chat intent separates generated examples from bank quiz requests', () => {
+  assert.equal(classifyChatIntent('Berikan contoh soal tentang materi baru'), 'material');
+  assert.equal(classifyChatIntent('Mulai kuis tentang fotosintesis'), 'quiz');
+  assert.equal(classifyChatIntent('Jawaban soal nomor 2 beserta pembahasannya'), 'question');
 });
 
 test('Password hashing and PBKDF2 verification securely validates passwords', () => {

@@ -2,48 +2,19 @@ import { db } from '../server/db.js';
 import { parseRequestBody } from '../server/http.js';
 import { getSupabaseConfig, supabaseRequest } from '../server/supabase.js';
 
-const TOPIC_RULES: Record<string, string[]> = {
-  algorithm: ['algoritma', 'perulangan', 'looping', 'iteration', 'berpikir komputasional', 'pseudocode', 'flowchart', 'percabangan', 'variabel', 'dekomposisi', 'abstraksi'],
-  network: ['subnetting', 'cidr', 'ip address', 'ipv4', 'jaringan', 'router', 'switch', 'vlan', 'network address', 'broadcast'],
-  web: ['html', 'css', 'javascript', 'dom', 'flexbox', 'website', 'web'],
-  database: ['basis data', 'database', 'sql', 'mysql', 'postgresql', 'normalisasi', 'primary key', 'foreign key', 'query'],
-  security: ['keamanan digital', 'cyber security', 'phishing', 'malware', 'enkripsi', 'privasi'],
-  operating_system: ['sistem operasi', 'linux', 'windows', 'kernel', 'virtualisasi']
-};
-
-function detectTopic(text: string): string | null {
-  const lower = text.toLowerCase();
-  let best: { topic: string; hits: number } | null = null;
-  for (const [topic, signals] of Object.entries(TOPIC_RULES)) {
-    const hits = signals.filter(signal => lower.includes(signal)).length;
-    if (!best || hits > best.hits) best = { topic, hits };
-  }
-  return best && best.hits > 0 ? best.topic : null;
-}
-
 function normalizeQuery(text: string): string {
-  let normalized = text.toLowerCase();
-  const aliases: Record<string, string> = {
-    looping: 'perulangan',
-    loop: 'perulangan',
-    iteration: 'perulangan',
-    kode: '',
-    contoh: ''
-  };
-  for (const [alias, replacement] of Object.entries(aliases)) {
-    normalized = normalized.replace(new RegExp(`\\b${alias}\\b`, 'g'), replacement);
-  }
-  return normalized.replace(/\s+/g, ' ').trim();
+  return text.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
 type ChatIntent = 'material' | 'question' | 'quiz' | 'question_quiz';
 
-function classifyChatIntent(text: string): ChatIntent {
+export function classifyChatIntent(text: string): ChatIntent {
   const lower = text.toLowerCase();
   if (/\b(soal|latihan)\b/.test(lower) && /\bkuis\b/.test(lower)) return 'question_quiz';
   if (/^\s*(beri|berikan|kasih|bikin|buat)?\s*(dong\s*)?(contoh|contohin)?\s*(soal|latihan)\b/.test(lower)) return 'material';
-  if (/\b(kuis|latihan kuis|mulai kuis|paket kuis|nilai kuis)\b/.test(lower)) return 'quiz';
-  if (/\b(soal|pilihan ganda|pilgan|jawaban benar|jawab soal|bank soal|kunci jawaban|pembahasan soal|nomor)\b/.test(lower)) return 'question';
+  if (/^(mulai|mau|ikut|kerjakan|uji aku dengan)\b.*\bkuis\b/.test(lower) ||
+      /\b(paket kuis|latihan kuis|nilai kuis)\b/.test(lower)) return 'quiz';
+  if (/\b(bank soal|soal nomor|nomor \d|jawaban benar|jawab soal|kunci jawaban|pembahasan soal)\b/.test(lower)) return 'question';
   return 'material';
 }
 
@@ -61,22 +32,57 @@ function rankPublicContent(query: string, rows: any[], fields: string[]): any[] 
   }).filter(item => item.score > 0).sort((a, b) => b.score - a.score).map(item => item.row);
 }
 
-const LANGUAGE_RULES: Array<{ name: string; signals: string[] }> = [
-  { name: 'javascript', signals: ['javascript', 'js', 'node.js', 'nodejs'] },
-  { name: 'python', signals: ['python', 'py'] },
-  { name: 'java', signals: ['java'] },
-  { name: 'c++', signals: ['c++'] },
-  { name: 'php', signals: ['php'] }
-];
+const CHAT_STOP_WORDS = new Set([
+  'apa', 'itu', 'ini', 'yang', 'untuk', 'dengan', 'tentang', 'bagaimana',
+  'cara', 'jelaskan', 'materi', 'konsep', 'dasar', 'gimana', 'nih', 'dong',
+  'sih', 'ya', 'bro', 'maksud', 'tolong', 'beri', 'berikan', 'kasih'
+]);
 
-function detectLanguages(text: string): string[] {
-  const lower = text.toLowerCase();
-  return LANGUAGE_RULES
-    .filter(rule => rule.signals.some(signal => {
-      if (signal === 'js') return new RegExp('(^|[^a-z])js([^a-z]|$)', 'i').test(lower);
-      return lower.includes(signal);
-    }))
-    .map(rule => rule.name);
+export function getChatTokens(text: string): string[] {
+  return [...new Set(normalizeQuery(text)
+    .replace(/[^a-z0-9+\-\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !CHAT_STOP_WORDS.has(word)))];
+}
+
+function getMaterialSearchText(material: any): string {
+  return [
+    material.title, material.category, material.summary, material.keywords,
+    material.aliases, material.learning_objectives, material.content,
+    material.examples, material.practice_steps, material.faq
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+export function rankMaterialsForChat(message: string, materials: any[]): Array<{ material: any; score: number }> {
+  const tokens = getChatTokens(message);
+  return materials.map(material => {
+    const text = getMaterialSearchText(material);
+    let score = 0;
+    for (const token of tokens) {
+      if (String(material.title || '').toLowerCase().includes(token)) score += 8;
+      if (String(material.keywords || '').toLowerCase().includes(token)) score += 6;
+      if (String(material.aliases || '').toLowerCase().includes(token)) score += 5;
+      if (String(material.summary || '').toLowerCase().includes(token)) score += 3;
+      if (String(material.content || '').toLowerCase().includes(token)) score += 1;
+    }
+    return { material, score };
+  }).filter(item => item.score > 0).sort((a, b) => b.score - a.score);
+}
+
+export function resolveChatQuery(message: string, history: Array<{ role: string; content: string }> = [], materials: any[] = []): string {
+  const latest = message.trim();
+  const recentUsers = history.filter(item => item.role === 'user').map(item => item.content.trim()).filter(Boolean).slice(-2);
+  const explicitMaterial = materials.find(material => {
+    const tokens = getChatTokens(latest);
+    const metadata = `${material.title || ''} ${material.category || ''} ${material.keywords || ''} ${material.aliases || ''}`.toLowerCase();
+    return tokens.length > 0 && tokens.some(token => token.length >= 4 && metadata.includes(token));
+  });
+  if (explicitMaterial) return latest;
+
+  const isReference = /^(lanjut|lanjutkan|terusin|jelaskan lagi)\b/i.test(latest) ||
+    /\b(itu|tersebut|lanjutannya|rumusnya|fungsinya|contohnya)\b/i.test(latest);
+  if (!isReference || recentUsers.length === 0) return latest;
+  return `${recentUsers[recentUsers.length - 1]} ${latest}`;
 }
 
 function extractRelevantSections(material: any, message: string, limit = 1800): string {
@@ -123,41 +129,9 @@ function extractRelevantSections(material: any, message: string, limit = 1800): 
 }
 
 function buildSpecificFallback(message: string, material: any): string {
-  const normalized = message.toLowerCase();
-  const content = `${material.summary || ''}\n${material.content || ''}`;
-  const lowerContent = content.toLowerCase();
-
-  if (/contoh.*(kodenya|for|while)|^(bagaimana|berikan).*kode/.test(normalized)) {
-    if (lowerContent.includes('perulangan for') && lowerContent.includes('perulangan while')) {
-      return 'Berdasarkan materi guru:\n\n**Contoh `for`:**\n```python\nfor i in range(1, 6):\n    print(i)\n```\n\n**Contoh `while`:**\n```python\ni = 1\nwhile i <= 3:\n    print("Halo!")\n    i += 1\n```';
-    }
-  }
-
-  if (/(beda|perbedaan|pembeda).*(for|while)|(for|while).*(beda|perbedaan)/.test(normalized)) {
-    if (lowerContent.includes('perulangan for') && lowerContent.includes('perulangan while')) {
-      return 'Berdasarkan materi guru:\n\n- **`for`** digunakan ketika jumlah pengulangan atau urutan data sudah diketahui.\n- **`while`** digunakan selama suatu kondisi masih bernilai benar atau `True`.\n\nContoh `for`:\n```python\nfor i in range(1, 6):\n    print(i)\n```\n\nContoh `while`:\n```python\ni = 1\nwhile i <= 3:\n    print("Halo!")\n    i += 1\n```';
-    }
-  }
-
-  if (/contoh.*(for|while)|^(bagaimana|berikan).*kode/.test(normalized)) {
-    if (lowerContent.includes('perulangan for') && lowerContent.includes('perulangan while')) {
-      return 'Berdasarkan materi guru:\n\n**Contoh `for`:**\n```python\nfor i in range(1, 6):\n    print(i)\n```\n\n**Contoh `while`:**\n```python\ni = 1\nwhile i <= 3:\n    print(\"Halo!\")\n    i += 1\n```';
-    }
-  }
-
-  if (/continue/.test(normalized) && lowerContent.includes('continue')) {
-    if (/break/.test(normalized) && lowerContent.includes('break')) {
-      return 'Berdasarkan materi guru:\n\n- **`break`** menghentikan perulangan secara langsung meskipun kondisi masih bisa berlanjut.\n- **`continue`** melewati satu putaran perulangan dan melanjutkan ke putaran berikutnya.';
-    }
-    return 'Berdasarkan materi guru, `continue` digunakan untuk **melewati satu putaran perulangan** dan melanjutkan ke putaran berikutnya tanpa mengakhiri seluruh perulangan.';
-  }
-
-  if (/break/.test(normalized) && lowerContent.includes('break')) {
-    return 'Berdasarkan materi guru, `break` digunakan untuk **menghentikan perulangan secara langsung**, meskipun kondisi perulangan sebenarnya masih dapat berlanjut.';
-  }
-
   const relevant = extractRelevantSections(material, message, 600);
-  return relevant || 'Guru belum memberikan materi untuk pertanyaan ini.';
+  if (!relevant) return `Materi **${material.title}** dari guru belum memuat penjelasan yang cukup untuk pertanyaan tersebut secara spesifik.`;
+  return `Berdasarkan materi guru:\n\n${relevant}`;
 }
 
 function buildDefinitionAnswer(message: string, material: any): string | null {
@@ -167,27 +141,21 @@ function buildDefinitionAnswer(message: string, material: any): string | null {
     material.content || '',
     material.faq || ''
   ].filter(Boolean).join('\n\n');
-
-  if (/\b(subnetting)\b/i.test(normalized) && /\b(apa itu|lalu apa|apa sih)\b/i.test(normalized)) {
-    const summary = String(material.summary || '').trim();
-    if (summary && /subnetting/i.test(summary)) {
-      return `Berdasarkan materi guru:\n\n${summary}`;
-    }
-  }
-
-  if (/ip(v4)?\b|ip\/4/.test(normalized) && /berapa|terdiri|bit|oktet/.test(normalized)) {
-    const paragraph = source.split(/\n\s*\n/)
-      .map((item: string) => item.replace(/\s+/g, ' ').trim())
-      .find((item: string) => /ipv4/i.test(item) && /32 bit/i.test(item) && /4 oktet/i.test(item));
-    if (paragraph) return `Berdasarkan materi guru:\n\n${paragraph}`;
-  }
-
   const definitionMatch = normalized.match(/\bapa itu\s+([a-z][a-z0-9 +_-]{2,40})\??$/i);
   if (definitionMatch) {
-    const concept = definitionMatch[1].trim();
+    const concept = definitionMatch[1]
+      .replace(/\s+(bro|sih|dong|nih|ya|tolong)$/i, '')
+      .trim();
     const paragraph = source.split(/\n\s*\n/)
       .map((item: string) => item.replace(/\s+/g, ' ').trim())
-      .find((item: string) => item.toLowerCase().includes(concept));
+      .find((item: string) => {
+        const lower = item.toLowerCase();
+        return lower.includes(concept) && (
+          lower.includes(`${concept} adalah`) ||
+          lower.includes(`${concept} merupakan`) ||
+          lower.startsWith(concept)
+        );
+      });
     if (paragraph) return `Berdasarkan materi guru:\n\n${paragraph}`;
   }
 
@@ -323,157 +291,13 @@ export default async function handler(req: any, res: any) {
         }]
       });
     }
-    const algorithmMaterial = materials.find((material: any) =>
-      /algoritma|perulangan|looping|pemrograman python/i.test(
-        `${material.title || ''} ${material.summary || ''} ${material.category || ''}`
-      )
-    );
-    const normalizedQuestion = normalizeQuery(message);
-    if (/\bbreak\b/.test(normalizedQuestion) && /\bcontinue\b/.test(normalizedQuestion) && algorithmMaterial) {
-      const sourceText = `${algorithmMaterial.summary || ''}\n${algorithmMaterial.content || ''}`.toLowerCase();
-      if (sourceText.includes('break') && sourceText.includes('continue')) {
-        return res.status(200).json({
-          answer: 'Berdasarkan materi guru:\n\n- **`break`** menghentikan perulangan secara langsung meskipun kondisi masih bisa berlanjut.\n- **`continue`** melewati satu putaran perulangan dan melanjutkan ke putaran berikutnya.',
-          isRefusal: false,
-          sources: [{
-            title: algorithmMaterial.title,
-            category: algorithmMaterial.category,
-            teacher_name: algorithmMaterial.teacher_name || 'Guru Informatika',
-            summary: algorithmMaterial.summary
-          }]
-        });
-      }
-    }
-    const stopWords = new Set(['apa','yang','untuk','dengan','tentang','bagaimana','cara','jelaskan','perbedaan','dan','atau','materi','konsep','dasar','contoh','kode','itu','ini']);
     const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
-    const lastUserQuestion = [...history].reverse().find((item: any) => item?.role === 'user' && typeof item.content === 'string')?.content;
-    const continuationPattern = /^(lanjut|lanjutkan|terusin|jelaskan lagi|contohnya|itu maksudnya|dari itu)\b/i;
-    const pronounPattern = /\b(itu|tersebut|lanjutannya|rumusnya|fungsinya|contohnya)\b/i;
-    const veryShortReference = /^\b(kenapa|mengapa|berapa)\b[\s\S]*\?$/i.test(message) && message.split(/\s+/).length <= 4;
-    const domainFollowup = /^berapa\b.*\b(host|subnet|cidr|blok|broadcast|network|perulangan|loop)\b/i.test(message);
-    const containsExplicitTopic = /\b(subnetting|cidr|loop|looping|perulangan|for|while|break|continue|html|css|javascript|sql|database|basis data)\b/i.test(message);
-    const isFollowUp = !containsExplicitTopic && (continuationPattern.test(message) || pronounPattern.test(message) || veryShortReference || domainFollowup);
-    const resolvedMessage = isFollowUp && lastUserQuestion
-      ? `${lastUserQuestion}\n${message}`
-      : message || '';
-
-    const normalizedDefinitionRequest = resolvedMessage
-      .trim()
-      .replace(/\s+(bro|sih|dong|nih|ya|tolong)$/i, '')
-      .trim();
-    if (/^(?:apa itu range|range itu apa|range tuh apa)(?: ya)?\??$/i.test(normalizedDefinitionRequest)) {
-      const loopingMaterial = materials.find((material: any) =>
-        /\b(range|for|while|perulangan|looping)\b/i.test(`${material.title || ''} ${material.summary || ''} ${material.keywords || ''} ${material.content || ''}`)
-      );
-      if (loopingMaterial) {
-        const rangeExample = `${loopingMaterial.summary || ''}\n${loopingMaterial.content || ''}\n${loopingMaterial.examples || ''}`
-          .split(/\n\s*\n/)
-          .map((item: string) => item.replace(/\s+/g, ' ').trim())
-          .find((item: string) => /\brange\s*\(/i.test(item));
-        return res.status(200).json({
-          answer: 'Berdasarkan materi guru, `range()` digunakan pada perulangan `for` untuk membuat urutan angka yang akan diproses.' +
-            (rangeExample ? `\n\nContoh yang diberikan guru:\n\`\`\`python\n${rangeExample}\n\`\`\`` : ''),
-          isRefusal: false,
-          sources: [{
-            title: loopingMaterial.title,
-            category: loopingMaterial.category,
-            teacher_name: loopingMaterial.teacher_name || 'Guru Informatika',
-            summary: loopingMaterial.summary
-          }]
-        });
-      }
-    }
-    if (/^(lalu\s+)?(apa itu|apa sih|apa arti)\s+subnetting\??$/i.test(normalizedDefinitionRequest) ||
-        /^subnetting itu apa\??$/i.test(normalizedDefinitionRequest) ||
-        /\b(apa itu|apa sih|apa arti|itu apa)\b/i.test(normalizedDefinitionRequest) && /\bsubnetting\b/i.test(normalizedDefinitionRequest)) {
-      const subnetMaterial = materials.find((material: any) =>
-        /\bsubnetting\b/i.test(`${material.title || ''} ${material.summary || ''} ${material.keywords || ''} ${material.content || ''}`)
-      );
-      if (subnetMaterial?.summary) {
-        return res.status(200).json({
-          answer: `Berdasarkan materi guru:\n\n${subnetMaterial.summary}`,
-          isRefusal: false,
-          sources: [{
-            title: subnetMaterial.title,
-            category: subnetMaterial.category,
-            teacher_name: subnetMaterial.teacher_name || 'Guru Informatika',
-            summary: subnetMaterial.summary
-          }]
-        });
-      }
-    }
-
-    const generalDefinition = normalizedDefinitionRequest.match(/^(?:apa itu|apa sih|apa arti)\s+(.{2,40})\??$/i);
-    if (generalDefinition) {
-      const concept = generalDefinition[1].trim().toLowerCase();
-      if (/^(range|for|while|break|continue)$/.test(concept)) {
-        // Let the dedicated concept handlers below answer these language/programming terms.
-      } else {
-      const exactMaterial = materials.find((material: any) =>
-        `${material.title || ''} ${material.keywords || ''}`.toLowerCase().includes(concept)
-      );
-      if (exactMaterial?.summary) {
-        return res.status(200).json({
-          answer: `Berdasarkan materi guru:\n\n${exactMaterial.summary}`,
-          isRefusal: false,
-          sources: [{
-            title: exactMaterial.title,
-            category: exactMaterial.category,
-            teacher_name: exactMaterial.teacher_name || 'Guru Informatika',
-            summary: exactMaterial.summary
-          }]
-        });
-      }
-      }
-    }
-
-    const normalizedMessage = normalizeQuery(resolvedMessage);
-    const words: string[] = normalizedMessage.replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/).filter((w: string) => w.length > 2 && !stopWords.has(w));
-    const resolvedTopic = detectTopic(normalizedMessage);
-    const scored = materials.map(material => {
-      const title = String(material.title || '').toLowerCase();
-      const summary = String(material.summary || '').toLowerCase();
-      const keywords = String(material.keywords || '').toLowerCase();
-      const content = String(material.content || '').toLowerCase();
-      const materialTopic = detectTopic(`${title} ${summary} ${keywords} ${content}`);
-      if (resolvedTopic && materialTopic && resolvedTopic !== materialTopic) return { material, score: 0 };
-
-      let score = 0;
-      for (const word of words) {
-        if (title.includes(word)) score += 6;
-        if (summary.includes(word)) score += 4;
-        if (keywords.includes(word)) score += 5;
-        if (content.includes(word)) score += 1;
-      }
-      if (resolvedTopic && materialTopic === resolvedTopic) score += 12;
-      if (normalizedMessage.length >= 4) {
-        const phraseFound = normalizedMessage.split(/\s+/).filter(word => word.length > 5).find(word =>
-          `${title} ${summary} ${keywords} ${content}`.includes(word)
-        );
-        if (phraseFound) score += 3;
-      }
-      return { material, score };
-    }).filter(item => item.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
+    const resolvedMessage = resolveChatQuery(message, history, materials);
+    const scored = rankMaterialsForChat(resolvedMessage, materials).slice(0, 3);
 
     if (scored.length === 0) {
       return res.status(200).json({
         answer: 'Guru belum memberikan materi untuk pertanyaan ini. Silakan pilih materi atau tanyakan pada kategori yang sudah diunggah guru.',
-        isRefusal: true,
-        sources: []
-      });
-    }
-
-    const queryLanguages = detectLanguages(normalizedMessage);
-    const languageMismatch = scored.find(({ material }: any) => {
-      const sourceText = `${material.title || ''} ${material.summary || ''} ${material.content || ''}`;
-      const sourceLanguages = detectLanguages(sourceText);
-      return queryLanguages.length > 0 &&
-        sourceLanguages.length > 0 &&
-        !queryLanguages.some(language => sourceLanguages.includes(language));
-    });
-    if (queryLanguages.length > 0 && languageMismatch) {
-      return res.status(200).json({
-        answer: 'Guru belum memberikan materi yang membahas bahasa atau teknologi tersebut secara spesifik. Silakan gunakan pertanyaan yang sesuai dengan materi yang sudah diunggah guru.',
         isRefusal: true,
         sources: []
       });
@@ -512,58 +336,6 @@ export default async function handler(req: any, res: any) {
     if (definitionAnswer) {
       return res.status(200).json({
         answer: definitionAnswer,
-        isRefusal: false,
-        sources
-      });
-    }
-
-    if (/\brange\b/i.test(normalizeQuery(message))) {
-      const rangeParagraph = sourceContent
-        .split(/\n\s*\n/)
-        .map((paragraph: string) => paragraph.replace(/\s+/g, ' ').trim())
-        .find((paragraph: string) => /\brange\s*\(/i.test(paragraph) || /\brange\b/i.test(paragraph));
-      if (!rangeParagraph) {
-        return res.status(200).json({
-          answer: 'Guru belum memberikan penjelasan khusus tentang `range` dalam materi yang tersedia.',
-          isRefusal: true,
-          sources
-        });
-      }
-      const isBareExample = !/(range.*(?:fungsi|digunakan|menhasilkan|urutan)|(?:fungsi|pengertian).*range)/i.test(rangeParagraph);
-      return res.status(200).json({
-        answer: isBareExample
-          ? 'Berdasarkan materi guru, `range()` digunakan pada perulangan `for` untuk membuat urutan angka yang akan diproses.\n\nContoh yang diberikan guru:\n```python\n' + rangeParagraph.replace(/^[^`]*?for /i, 'for ') + '\n```'
-          : `Berdasarkan materi guru:\n\n${rangeParagraph}`,
-        isRefusal: false,
-        sources
-      });
-    }
-
-    if (/kenapa|mengapa/i.test(message) && /\b(loop|perulangan|looping)\b/i.test(normalizeQuery(message))) {
-      const lines = sourceContent.split(/\n/).map((line: string) => line.trim()).filter(Boolean);
-      const whyIndex = lines.findIndex((line: string) => /mengapa|kenapa|dibutuhkan/i.test(line) && /loop|perulangan/i.test(line));
-      let whyText = '';
-      if (whyIndex >= 0) {
-        whyText = lines.slice(whyIndex, whyIndex + 4).join('\n');
-      } else {
-        const whyParagraph = sourceContent.split(/\n\s*\n/)
-          .map((paragraph: string) => paragraph.replace(/\s+/g, ' ').trim())
-          .find((paragraph: string) => /loop|perulangan/i.test(paragraph) && /ulang|efisiens|instruksi/i.test(paragraph));
-        whyText = whyParagraph || '';
-      }
-      if (whyText) {
-        return res.status(200).json({
-          answer: `Berdasarkan materi guru:\n\n${whyText}`,
-          isRefusal: false,
-          sources
-        });
-      }
-    }
-
-    if (/contoh\s+(soal|latihan)/i.test(message) && !/\b(jawab|jawaban|kunci|pilihan ganda)\b/i.test(message)) {
-      const title = primaryMaterial.title || 'materi yang dipelajari';
-      return res.status(200).json({
-        answer: `Contoh soal dari materi **${title}**:\n\n1. Jelaskan poin utama yang dijelaskan materi ini dengan kata-katamu sendiri.\n2. Berikan satu contoh penerapan konsep tersebut dalam kehidupan sehari-hari.\n3. Buat satu contoh kasus singkat berdasarkan materi, lalu jelaskan langkah penyelesaiannya.`,
         isRefusal: false,
         sources
       });
