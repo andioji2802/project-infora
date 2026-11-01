@@ -1,10 +1,5 @@
 {
   "rewrites": [
-    { "source": "/api/auth/login", "destination": "/api/auth-login" },
-    { "source": "/api/auth/register", "destination": "/api/auth-register" },
-    { "source": "/api/auth/me", "destination": "/api/auth-me" },
-    { "source": "/api/auth/profile", "destination": "/api/auth-profile" },
-    { "source": "/api/auth/logout", "destination": "/api/auth-logout" },
-    { "source": "/api/stats", "destination": "/api/stats" }
+    { "source": "/api/:path*", "destination": "/api/[...path]" }
   ]
 }
