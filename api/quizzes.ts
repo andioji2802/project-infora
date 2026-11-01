@@ -16,16 +16,56 @@ export default async function handler(req: any, res: any) {
   if (getSupabaseConfig()) {
     if (req.method === 'GET') {
       const id = String(req.query?.id || '');
-      const query = id ? { id: `eq.${id}`, select: '*' } : { status: 'eq.published', select: '*', order: 'updated_at.desc' };
+      const query: Record<string, string> = id
+        ? { id: `eq.${id}`, select: '*' }
+        : { status: 'eq.published', select: '*', order: 'updated_at.desc' };
       const result = await supabaseRequest('quizzes', { query });
-      return res.status(result.status === 200 ? 200 : result.status).json(id ? result.data[0] || { error: 'Kuis tidak ditemukan.' } : result.data);
+      if (!id) return res.status(result.status === 200 ? 200 : result.status).json(result.data);
+      const quiz = result.data[0];
+      if (!quiz) return res.status(404).json({ error: 'Kuis tidak ditemukan.' });
+      const ids = Array.isArray(quiz.question_ids)
+        ? quiz.question_ids
+        : (typeof quiz.question_ids === 'string' ? (() => { try { return JSON.parse(quiz.question_ids || '[]'); } catch { return []; } })() : []);
+      const questionsResult = ids.length
+        ? await supabaseRequest('questions', { query: { id: `in.(${ids.join(',')})`, status: 'eq.published', select: '*' } })
+        : { data: [] };
+      const questions = ids.map((questionId: string) =>
+        questionsResult.data.find((question: any) => question.id === questionId)
+      ).filter(Boolean);
+      return res.status(200).json({ ...quiz, questions });
     }
     if (req.method === 'POST' && req.query?.grade === 'true') {
       const quizId = String(req.query?.id || supabaseBody.quizId || '');
       const quizResult = await supabaseRequest('quizzes', { query: { id: `eq.${quizId}`, select: '*' } });
       const quiz = quizResult.data[0];
       if (!quiz) return res.status(404).json({ error: 'Kuis tidak ditemukan.' });
-      return res.status(200).json({ score: 0, correct: 0, total: 0 });
+      const ids = Array.isArray(quiz.question_ids)
+        ? quiz.question_ids
+        : (typeof quiz.question_ids === 'string' ? (() => { try { return JSON.parse(quiz.question_ids || '[]'); } catch { return []; } })() : []);
+      const questionsResult = ids.length
+        ? await supabaseRequest('questions', { query: { id: `in.(${ids.join(',')})`, status: 'eq.published', select: '*' } })
+        : { data: [] };
+      const answers = supabaseBody.answers || {};
+      let correctCount = 0;
+      const results: any[] = [];
+      for (const question of (ids.map((questionId: string) =>
+        questionsResult.data.find((item: any) => item.id === questionId)
+      ).filter(Boolean) as any[])) {
+        const userAnswer = Number(answers[question.id]);
+        const correctAnswer = Number(question.correct_answer);
+        const isCorrect = Number.isInteger(userAnswer) && userAnswer === correctAnswer;
+        if (isCorrect) correctCount++;
+        results.push({
+          question_id: question.id,
+          is_correct: isCorrect,
+          user_answer: Number.isInteger(userAnswer) ? userAnswer : null,
+          correct_answer: correctAnswer,
+          explanation: question.explanation || ''
+        });
+      }
+      const total = results.length;
+      const score = total ? Math.round((correctCount / total) * 100) : 0;
+      return res.status(200).json({ score, correct: correctCount, correct_count: correctCount, total, results });
     }
     const profile = await getSessionProfile(req);
     if (!profile) return res.status(401).json({ error: 'Sesi guru diperlukan.' });
@@ -47,9 +87,9 @@ export default async function handler(req: any, res: any) {
     return quiz ? res.status(200).json(quiz) : res.status(404).json({ error: 'Kuis tidak ditemukan.' });
   }
   if (req.method === 'POST' && req.query?.grade === 'true') {
-    const quiz = db.getQuizById(String(req.query?.id || body.quizId || ''));
+    const quiz = db.getQuizById(String(req.query?.id || supabaseBody.quizId || ''));
     if (!quiz) return res.status(404).json({ error: 'Kuis tidak ditemukan.' });
-    const answers = body.answers || {};
+    const answers = supabaseBody.answers || {};
     let correct = 0;
     for (const questionId of quiz.question_ids) {
       const question = db.getQuestionById(questionId);
@@ -60,21 +100,21 @@ export default async function handler(req: any, res: any) {
   }
   const profile = teacher(req);
   if (!profile) return res.status(401).json({ error: 'Sesi guru diperlukan.' });
-  const id = String(req.query?.id || body.id || '');
+  const id = String(req.query?.id || supabaseBody.id || '');
   if (req.method === 'DELETE') return db.deleteQuiz(id) ? res.status(200).json({ success: true }) : res.status(404).json({ error: 'Kuis tidak ditemukan.' });
   if (req.method === 'POST') {
-    if (!body.title || !body.category || !Array.isArray(body.question_ids)) return res.status(400).json({ error: 'Judul, kategori, dan soal kuis wajib diisi.' });
+    if (!supabaseBody.title || !supabaseBody.category || !Array.isArray(supabaseBody.question_ids)) return res.status(400).json({ error: 'Judul, kategori, dan soal kuis wajib diisi.' });
     const now = new Date().toISOString();
     return res.status(201).json(db.upsertQuiz({
-      id: `quiz-${Date.now()}`, owner_id: profile.id, title: String(body.title).trim(),
-      description: body.description || '', category: body.category, difficulty: body.difficulty || 'Sedang',
-      status: body.status || 'published', question_ids: body.question_ids, created_at: now, updated_at: now
+      id: `quiz-${Date.now()}`, owner_id: profile.id, title: String(supabaseBody.title).trim(),
+      description: supabaseBody.description || '', category: supabaseBody.category, difficulty: supabaseBody.difficulty || 'Sedang',
+      status: supabaseBody.status || 'published', question_ids: supabaseBody.question_ids, created_at: now, updated_at: now
     }));
   }
   if (req.method === 'PUT') {
     const existing = db.getQuizById(id);
     if (!existing) return res.status(404).json({ error: 'Kuis tidak ditemukan.' });
-    return res.status(200).json(db.upsertQuiz({ ...existing, ...body, title: body.title?.trim() || existing.title, updated_at: new Date().toISOString() }));
+    return res.status(200).json(db.upsertQuiz({ ...existing, ...supabaseBody, title: supabaseBody.title?.trim() || existing.title, updated_at: new Date().toISOString() }));
   }
   return res.status(405).json({ error: 'Method tidak diizinkan.' });
 }
