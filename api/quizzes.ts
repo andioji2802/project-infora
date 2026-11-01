@@ -1,4 +1,5 @@
 import { db } from '../server/db.js';
+import { parseRequestBody } from '../server/http.js';
 
 function teacher(req: any) {
   const auth = req.headers?.authorization || '';
@@ -9,7 +10,7 @@ export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
-  const body = req.body || {};
+  const body = parseRequestBody(req);
   if (req.method === 'GET') {
     const id = String(req.query?.id || '');
     if (!id) return res.status(200).json(db.getQuizzes(true));

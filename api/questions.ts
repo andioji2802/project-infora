@@ -1,4 +1,5 @@
 import { db } from '../server/db.js';
+import { parseRequestBody } from '../server/http.js';
 
 function teacher(req: any) {
   const auth = req.headers?.authorization || '';
@@ -12,7 +13,7 @@ export default async function handler(req: any, res: any) {
   const profile = teacher(req);
   if (req.method === 'GET') return res.status(200).json(db.getQuestions(!profile));
   if (!profile) return res.status(401).json({ error: 'Sesi guru diperlukan.' });
-  const body = req.body || {};
+  const body = parseRequestBody(req);
   const id = String(req.query?.id || body.id || '');
   if (req.method === 'DELETE') return db.deleteQuestion(id) ? res.status(200).json({ success: true }) : res.status(404).json({ error: 'Soal tidak ditemukan.' });
   if (req.method === 'POST') {

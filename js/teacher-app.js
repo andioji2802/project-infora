@@ -363,7 +363,7 @@ class TeacherApp {
       const res = await fetch(apiUrl('/api/auth-profile'), {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'text/plain;charset=UTF-8',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(payload)

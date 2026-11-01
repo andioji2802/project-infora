@@ -232,7 +232,7 @@ export class TeacherQuizzesManager {
       const res = await fetch(apiUrl(url), {
         method,
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'text/plain;charset=UTF-8',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(data)

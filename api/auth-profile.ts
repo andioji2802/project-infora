@@ -1,4 +1,5 @@
 import { db } from '../server/db.js';
+import { parseRequestBody } from '../server/http.js';
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', req.headers?.origin || '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
@@ -7,7 +8,7 @@ export default async function handler(req: any, res: any) {
   const auth = req.headers?.authorization || '';
   const profile = auth.startsWith('Bearer ') ? db.getUserFromSession(auth.slice(7)) : null;
   if (!profile) return res.status(401).json({ error: 'Sesi login tidak valid.' });
-  const body = req.body || {};
+  const body = parseRequestBody(req);
   const updated = db.updateProfile(profile.id, {
     full_name: body.full_name?.trim() || profile.full_name,
     school_name: body.school_name?.trim() || profile.school_name,

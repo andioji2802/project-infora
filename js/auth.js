@@ -21,7 +21,7 @@ export function clearAuthToken() {
 export async function loginTeacher(nip, password) {
   const res = await fetch(apiUrl('/api/auth-login'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
     body: JSON.stringify({ nip, password })
   });
   const data = await res.json().catch(() => ({}));
@@ -34,7 +34,7 @@ export async function loginTeacher(nip, password) {
 export async function registerTeacher(userData) {
   const res = await fetch(apiUrl('/api/auth-register'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
     body: JSON.stringify(userData)
   });
   const data = await res.json().catch(() => ({}));

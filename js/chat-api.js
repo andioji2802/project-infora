@@ -14,7 +14,7 @@ export async function sendChatMessage(message, history = []) {
   const response = await fetch(apiUrl('/api/chat'), {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'text/plain;charset=UTF-8'
     },
     body: JSON.stringify(payload)
   });
@@ -42,7 +42,7 @@ export async function fetchQuizDetail(quizId) {
 export async function submitQuizAnswers(quizId, answers) {
   const res = await fetch(apiUrl(`/api/quizzes?id=${encodeURIComponent(quizId)}&grade=true`), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
     body: JSON.stringify({ answers })
   });
   if (!res.ok) {
