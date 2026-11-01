@@ -1,10 +1,11 @@
 import { db, hashPassword } from '../server/db.js';
+import { parseRequestBody } from '../server/http.js';
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', req.headers?.origin || '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method tidak diizinkan.' });
-  const body = req.body || {};
+  const body = parseRequestBody(req);
   if (!body.fullName || !body.email || !body.password || !body.teacherIdentifier) {
     return res.status(400).json({ error: 'Nama, email, NIP, dan kata sandi wajib diisi.' });
   }

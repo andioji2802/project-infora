@@ -1,4 +1,5 @@
 import { db } from '../server/db.js';
+import { parseRequestBody } from '../server/http.js';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', req.headers?.origin || '*');
@@ -7,7 +8,8 @@ export default async function handler(req: any, res: any) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method tidak diizinkan.' });
   try {
-    const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+    const body = parseRequestBody(req);
+    const message = typeof body.message === 'string' ? body.message.trim() : '';
     if (!message) return res.status(400).json({ error: 'Pesan pertanyaan tidak boleh kosong.' });
 
     const materials = db.getMaterials('published');
@@ -85,7 +87,8 @@ export default async function handler(req: any, res: any) {
   } catch (error: any) {
     console.error('Chat error:', error);
     const materials = db.getMaterials('published');
-    const words = String(typeof req.body?.message === 'string' ? req.body.message : '').toLowerCase().split(/\s+/).filter(Boolean);
+    const fallbackBody = parseRequestBody(req);
+    const words = String(typeof fallbackBody.message === 'string' ? fallbackBody.message : '').toLowerCase().split(/\s+/).filter(Boolean);
     const match = materials.find(material =>
       words.some(word => word.length > 3 && `${material.title} ${material.summary || ''} ${material.keywords || ''} ${material.content}`.toLowerCase().includes(word))
     );
