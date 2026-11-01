@@ -8,7 +8,7 @@ import { TeacherMaterialsManager } from './teacher-materials.js';
 import { TeacherQuestionsManager } from './teacher-questions.js';
 import { TeacherQuizzesManager } from './teacher-quizzes.js';
 import { escapeHtml, showToast } from './utils.js';
-import { validateTeacherLogin, validateTeacherRegistration } from './validation.js';
+import { validatePasswordReset, validateTeacherLogin, validateTeacherRegistration } from './validation.js';
 import { apiUrl } from './api-config.js';
 
 class TeacherApp {
@@ -50,6 +50,106 @@ class TeacherApp {
     if (registerTab) registerTab.classList.remove('active');
   }
 
+  openPasswordResetModal(identifier) {
+    const existing = document.getElementById('password-reset-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-backdrop';
+    modal.id = 'password-reset-modal';
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width:460px;">
+        <div class="modal-header">
+          <h2 class="modal-title">Buat Kata Sandi Baru</h2>
+          <button type="button" class="modal-close" id="password-reset-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="password-reset-form">
+            <div class="form-group">
+              <label class="form-label" for="reset-new-password">Kata sandi baru</label>
+              <div style="position:relative;">
+                <input type="password" id="reset-new-password" class="form-input" autocomplete="new-password" required style="padding-right:44px;" />
+                <button type="button" id="reset-password-toggle" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:transparent;cursor:pointer;">Lihat</button>
+              </div>
+            </div>
+            <div style="display:grid;gap:6px;font-size:0.82rem;color:var(--color-text-secondary);">
+              <span data-reset-rule="length">○ Minimal 8 karakter</span>
+              <span data-reset-rule="upper">○ Ada huruf besar</span>
+              <span data-reset-rule="lower">○ Ada huruf kecil</span>
+              <span data-reset-rule="number">○ Ada angka</span>
+              <span data-reset-rule="symbol">○ Ada simbol</span>
+            </div>
+            <button type="submit" id="password-reset-submit" class="btn btn-primary" style="width:100%;margin-top:16px;" disabled>Selesai</button>
+          </form>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const close = () => modal.remove();
+    document.getElementById('password-reset-close').addEventListener('click', close);
+    modal.addEventListener('click', event => {
+      if (event.target === modal) close();
+    });
+
+    const input = document.getElementById('reset-new-password');
+    const submit = document.getElementById('password-reset-submit');
+    const toggle = document.getElementById('reset-password-toggle');
+    toggle.addEventListener('click', () => {
+      const visible = input.type === 'text';
+      input.type = visible ? 'password' : 'text';
+      toggle.textContent = visible ? 'Lihat' : 'Sembunyikan';
+    });
+
+    input.addEventListener('input', () => {
+      const validation = validatePasswordReset(input.value);
+      Object.entries(validation.rules).forEach(([rule, valid]) => {
+        const element = modal.querySelector(`[data-reset-rule="${rule}"]`);
+        if (!element) return;
+        element.textContent = `${valid ? '✓' : '○'} ${element.textContent.replace(/^[✓○]\s*/, '')}`;
+        element.style.color = valid ? '#16a34a' : '#64748b';
+      });
+      submit.disabled = !validation.isValid;
+    });
+
+    document.getElementById('password-reset-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const validation = validatePasswordReset(input.value);
+      if (!validation.isValid) {
+        showToast('Kata sandi belum memenuhi semua persyaratan.', 'error');
+        return;
+      }
+
+      submit.disabled = true;
+      submit.textContent = 'Memproses...';
+      let samePassword = false;
+      try {
+        const res = await fetch(apiUrl('/api/auth-reset'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            identifier.includes('@')
+              ? { email: identifier, newPassword: input.value }
+              : { nip: identifier, newPassword: input.value }
+          )
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          samePassword = data.code === 'SAME_PASSWORD';
+          throw new Error(data.error || 'Gagal memperbarui kata sandi.');
+        }
+        close();
+        this.showAuth();
+        window.alert('Kata sandi berhasil diperbarui. Silakan masuk dengan kata sandi baru.');
+      } catch (err) {
+        showToast(err.message, 'error');
+        submit.disabled = samePassword || !validatePasswordReset(input.value).isValid;
+      } finally {
+        submit.textContent = 'Selesai';
+      }
+    });
+  }
+
   showDashboard() {
     document.getElementById('teacher-auth-screen').style.display = 'none';
     document.getElementById('teacher-dashboard-screen').style.display = 'flex';
@@ -73,24 +173,10 @@ class TeacherApp {
     const forgotButton = document.getElementById('btn-forgot-password');
 
     if (forgotButton) {
-      forgotButton.addEventListener('click', async () => {
+      forgotButton.addEventListener('click', () => {
         const identifier = window.prompt('Masukkan email atau NIP/ID guru yang terdaftar:');
         if (!identifier?.trim()) return;
-        forgotButton.disabled = true;
-        try {
-          const res = await fetch(apiUrl('/api/auth-reset'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(identifier.includes('@') ? { email: identifier.trim() } : { nip: identifier.trim() })
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data.error || 'Permintaan reset gagal.');
-          window.alert(`Kata sandi sementara: ${data.temporaryPassword}\nSegera ubah setelah masuk.`);
-        } catch (err) {
-          showToast(err.message, 'error');
-        } finally {
-          forgotButton.disabled = false;
-        }
+        this.openPasswordResetModal(identifier.trim());
       });
     }
 

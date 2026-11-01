@@ -56,6 +56,20 @@ export function validateTeacherRegistration(data) {
   };
 }
 
+export function validatePasswordReset(password) {
+  const rules = {
+    length: password.length >= 8,
+    upper: /[A-Z]/.test(password),
+    lower: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+    symbol: /[^A-Za-z0-9]/.test(password)
+  };
+  return {
+    isValid: Object.values(rules).every(Boolean),
+    rules
+  };
+}
+
 export function validateTeacherLogin(data) {
   const errors = {};
   if (!data.nip || !data.nip.trim()) {
