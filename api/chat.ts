@@ -356,6 +356,46 @@ export default async function handler(req: any, res: any) {
     const resolvedMessage = isFollowUp && lastUserQuestion
       ? `${lastUserQuestion}\n${message}`
       : message || '';
+
+    if (/^(lalu\s+)?(apa itu|apa sih|apa arti)\s+subnetting\??$/i.test(resolvedMessage.trim()) ||
+        /^subnetting itu apa\??$/i.test(resolvedMessage.trim())) {
+      const subnetMaterial = materials.find((material: any) =>
+        /\bsubnetting\b/i.test(`${material.title || ''} ${material.summary || ''} ${material.keywords || ''} ${material.content || ''}`)
+      );
+      if (subnetMaterial?.summary) {
+        return res.status(200).json({
+          answer: `Berdasarkan materi guru:\n\n${subnetMaterial.summary}`,
+          isRefusal: false,
+          sources: [{
+            title: subnetMaterial.title,
+            category: subnetMaterial.category,
+            teacher_name: subnetMaterial.teacher_name || 'Guru Informatika',
+            summary: subnetMaterial.summary
+          }]
+        });
+      }
+    }
+
+    const generalDefinition = resolvedMessage.trim().match(/^(?:apa itu|apa sih|apa arti)\s+(.{2,40})\??$/i);
+    if (generalDefinition) {
+      const concept = generalDefinition[1].trim().toLowerCase();
+      const exactMaterial = materials.find((material: any) =>
+        `${material.title || ''} ${material.keywords || ''}`.toLowerCase().includes(concept)
+      );
+      if (exactMaterial?.summary) {
+        return res.status(200).json({
+          answer: `Berdasarkan materi guru:\n\n${exactMaterial.summary}`,
+          isRefusal: false,
+          sources: [{
+            title: exactMaterial.title,
+            category: exactMaterial.category,
+            teacher_name: exactMaterial.teacher_name || 'Guru Informatika',
+            summary: exactMaterial.summary
+          }]
+        });
+      }
+    }
+
     const normalizedMessage = normalizeQuery(resolvedMessage);
     const words: string[] = normalizedMessage.replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/).filter((w: string) => w.length > 2 && !stopWords.has(w));
     const resolvedTopic = detectTopic(normalizedMessage);
