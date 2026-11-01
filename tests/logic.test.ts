@@ -69,6 +69,17 @@ test('Casual looping follow-ups retain the looping topic', () => {
   assert.match(resolved, /range/i);
 });
 
+test('New explicit subnetting topic does not inherit looping history', () => {
+  const history = [
+    { role: 'user' as const, content: 'Bagaimana looping dalam kehidupan sehari-hari?' },
+    { role: 'assistant' as const, content: 'Looping digunakan untuk menjalankan instruksi berulang.' }
+  ];
+
+  const resolved = resolveConversationQuery('Apa itu subnetting?', history);
+  assert.match(resolved, /^Apa itu subnetting\?$/i);
+  assert.doesNotMatch(resolved, /looping/i);
+});
+
 test('Contextual follow-ups use the matched material and student question', () => {
   const material: MaterialItem = {
     id: 'test-algorithm',

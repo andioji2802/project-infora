@@ -57,9 +57,11 @@ export function resolveConversationQuery(userMessage: string, history: ChatHisto
 
   if (recentUserQuestions.length === 0) return latest;
 
-  const followupPattern = /\b(itu|tersebut|lanjutkan|lanjut|contohnya|jelaskan lagi|berapa|rumusnya|range|rangnya|fungsinya)\b/i;
-  const casualShortPattern = /^(apa|apaan|kenapa|gimana|gmn|jelasin|contohin)\b/i;
-  if (followupPattern.test(latest) || (casualShortPattern.test(latest) && latest.split(/\s+/).length <= 7)) {
+  const explicitTopicPattern = /\b(subnetting|cidr|loop|looping|perulangan|for|while|break|continue|html|css|javascript|python|java|sql|database|basis data)\b/i;
+  const referencePattern = /\b(itu|tersebut|lanjutannya|rumusnya|fungsinya|contohnya)\b/i;
+  const continuationPattern = /^(lanjut|lanjutkan|terusin|jelaskan lagi)\b/i;
+  const domainFollowupPattern = /^berapa\b.*\b(host|subnet|cidr|blok|broadcast|network|perulangan|loop)\b/i;
+  if (!explicitTopicPattern.test(latest) && (referencePattern.test(latest) || continuationPattern.test(latest) || domainFollowupPattern.test(latest))) {
     return `${recentUserQuestions.join(' ')} ${latest}`;
   }
 
@@ -378,6 +380,39 @@ export async function processStudentChat(
   history: ChatHistoryItem[] = []
 ): Promise<RAGAnswerResult> {
   const lowerMessage = userMessage.toLowerCase();
+  if (/\b(soal|latihan)\b/.test(lowerMessage) && /\bkuis\b/.test(lowerMessage)) {
+    const questions = db.getQuestions(true);
+    const quizzes = db.getQuizzes(true);
+    const parts: string[] = [];
+    if (questions.length) {
+      const question = questions[0];
+      const options = Array.isArray(question.options) ? question.options : [];
+      parts.push(`**Contoh soal terbitkan guru:**\n${question.question_text}${options.length ? '\n\n' + options.map((option, index) => `${String.fromCharCode(65 + index)}. ${option}`).join('\n') : ''}`);
+    } else {
+      parts.push('Guru belum menerbitkan bank soal untuk topik tersebut.');
+    }
+    if (quizzes.length) {
+      parts.push(`**Kuis yang tersedia:** ${quizzes[0].title}${quizzes[0].description ? `\n${quizzes[0].description}` : ''}`);
+    } else {
+      parts.push('Guru belum menerbitkan kuis untuk topik tersebut.');
+    }
+    return { answer: parts.join('\n\n'), isRefusal: false, sources: [] };
+  }
+  if (/^(contoh|berikan contoh|kasih contoh|bikin|buat)\b.*\b(soal|latihan)\b/i.test(userMessage)) {
+    const materials = db.getMaterials('published');
+    const keyword = normalizeQueryAliases(resolveConversationQuery(userMessage, history));
+    const material = materials.find(item =>
+      `${item.title} ${item.summary} ${item.keywords} ${item.category}`.toLowerCase()
+        .includes(keyword.split(/\s+/).find(word => word.length > 4 && !['contoh','soal','latihan'].includes(word)) || '')
+    ) || materials[0];
+    return {
+      answer: material
+        ? `Contoh soal dari materi **${material.title}**:\n\n1. Jelaskan konsep utama dari materi ini dengan kata-katamu sendiri.\n2. Berikan satu contoh penerapan dalam kehidupan sehari-hari atau praktik.\n3. Buat satu kasus singkat berdasarkan materi dan jelaskan langkah penyelesaiannya.`
+        : 'Guru belum memberikan materi untuk membuat contoh soal.',
+      isRefusal: !material,
+      sources: material ? [{ title: material.title, category: material.category, teacher_name: material.teacher_name || 'Guru Informatika', summary: material.summary }] : []
+    };
+  }
   if (/\b(kuis|latihan kuis|mulai kuis|paket kuis|nilai kuis)\b/.test(lowerMessage)) {
     const quizzes = db.getQuizzes(true);
     const matches = quizzes.filter(quiz =>

@@ -36,12 +36,13 @@ function normalizeQuery(text: string): string {
   return normalized.replace(/\s+/g, ' ').trim();
 }
 
-type ChatIntent = 'material' | 'question' | 'quiz';
+type ChatIntent = 'material' | 'question' | 'quiz' | 'question_quiz';
 
 function classifyChatIntent(text: string): ChatIntent {
   const lower = text.toLowerCase();
+  if (/\b(soal|latihan)\b/.test(lower) && /\bkuis\b/.test(lower)) return 'question_quiz';
+  if (/^\s*(beri|berikan|kasih|bikin|buat)?\s*(dong\s*)?(contoh|contohin)?\s*(soal|latihan)\b/.test(lower)) return 'material';
   if (/\b(kuis|latihan kuis|mulai kuis|paket kuis|nilai kuis)\b/.test(lower)) return 'quiz';
-  if (/\b(contoh|beri|kasih)\b.*\b(soal|latihan)\b/.test(lower)) return 'material';
   if (/\b(soal|pilihan ganda|pilgan|jawaban benar|jawab soal|bank soal|kunci jawaban|pembahasan soal|nomor)\b/.test(lower)) return 'question';
   return 'material';
 }
@@ -177,6 +178,38 @@ export default async function handler(req: any, res: any) {
     }
     const intent = classifyChatIntent(message);
 
+    if (intent === 'question_quiz') {
+      let questions: any[] = db.getQuestions(true);
+      let quizzes: any[] = db.getQuizzes(true);
+      if (getSupabaseConfig()) {
+        const questionResult = await supabaseRequest('questions', { query: { status: 'eq.published', select: '*', order: 'updated_at.desc' } });
+        const quizResult = await supabaseRequest('quizzes', { query: { status: 'eq.published', select: '*', order: 'updated_at.desc' } });
+        if (questionResult.data.length) questions = questionResult.data;
+        if (quizResult.data.length) quizzes = quizResult.data;
+      }
+      const questionMatches = rankPublicContent(message.replace(/\bkuis\b/gi, ''), questions, ['question_text', 'category', 'competency', 'explanation']);
+      const quizMatches = rankPublicContent(message.replace(/\bsoal\b/gi, ''), quizzes, ['title', 'description', 'category']);
+      const parts: string[] = [];
+      if (questionMatches.length) {
+        const question = questionMatches[0];
+        const options = Array.isArray(question.options) ? question.options : [];
+        parts.push(`**Contoh soal terbitkan guru:**\n${question.question_text}${options.length ? '\n\n' + options.map((option: string, index: number) => `${String.fromCharCode(65 + index)}. ${option}`).join('\n') : ''}`);
+      } else {
+        parts.push('Guru belum menerbitkan bank soal untuk topik tersebut.');
+      }
+      if (quizMatches.length) {
+        const quiz = quizMatches[0];
+        parts.push(`**Kuis yang tersedia:** ${quiz.title}${quiz.description ? `\n${quiz.description}` : ''}`);
+      } else {
+        parts.push('Guru belum menerbitkan kuis untuk topik tersebut.');
+      }
+      return res.status(200).json({
+        answer: parts.join('\n\n'),
+        isRefusal: false,
+        sources: []
+      });
+    }
+
     if (intent === 'question') {
       let questions: any[] = db.getQuestions(true);
       if (getSupabaseConfig()) {
@@ -279,12 +312,12 @@ export default async function handler(req: any, res: any) {
     const stopWords = new Set(['apa','yang','untuk','dengan','tentang','bagaimana','cara','jelaskan','perbedaan','dan','atau','materi','konsep','dasar','contoh','kode','itu','ini']);
     const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
     const lastUserQuestion = [...history].reverse().find((item: any) => item?.role === 'user' && typeof item.content === 'string')?.content;
-    const continuationPattern = /\b(itu|tersebut|lanjut|lanjutkan|contohnya|jelaskan lagi|berapa|rumusnya|rang(e|enya)|fungsi nya|fungsinya|bentuknya)\b/i;
-    const shortCasualPattern = /^((apa|apaan|kenapa|gimana|gmn|contohin|jelasin|terusin|lanjutkan|range)\b[\s\S]*)$/i;
-    const previousDistinctTopic = lastUserQuestion && !/loop|perulangan|algoritma/i.test(message) && /loop|perulangan/i.test(lastUserQuestion);
-    const isFollowUp = continuationPattern.test(message)
-      || (shortCasualPattern.test(message) && message.split(/\s+/).length <= 7)
-      || (/^range\b/i.test(message) && !!previousDistinctTopic);
+    const continuationPattern = /^(lanjut|lanjutkan|terusin|jelaskan lagi|contohnya|itu maksudnya|dari itu)\b/i;
+    const pronounPattern = /\b(itu|tersebut|lanjutannya|rumusnya|fungsinya|contohnya)\b/i;
+    const veryShortReference = /^\b(kenapa|mengapa|berapa)\b[\s\S]*\?$/i.test(message) && message.split(/\s+/).length <= 4;
+    const domainFollowup = /^berapa\b.*\b(host|subnet|cidr|blok|broadcast|network|perulangan|loop)\b/i.test(message);
+    const containsExplicitTopic = /\b(subnetting|cidr|loop|looping|perulangan|for|while|break|continue|html|css|javascript|sql|database|basis data)\b/i.test(message);
+    const isFollowUp = !containsExplicitTopic && (continuationPattern.test(message) || pronounPattern.test(message) || veryShortReference || domainFollowup);
     const resolvedMessage = isFollowUp && lastUserQuestion
       ? `${lastUserQuestion}\n${message}`
       : message || '';
@@ -381,8 +414,11 @@ export default async function handler(req: any, res: any) {
           sources
         });
       }
+      const isBareExample = !/(range.*(?:fungsi|digunakan|menhasilkan|urutan)|(?:fungsi|pengertian).*range)/i.test(rangeParagraph);
       return res.status(200).json({
-        answer: `Berdasarkan materi guru:\n\n${rangeParagraph}`,
+        answer: isBareExample
+          ? 'Berdasarkan materi guru, `range()` digunakan pada perulangan `for` untuk membuat urutan angka yang akan diproses.\n\nContoh yang diberikan guru:\n```python\n' + rangeParagraph.replace(/^[^`]*?for /i, 'for ') + '\n```'
+          : `Berdasarkan materi guru:\n\n${rangeParagraph}`,
         isRefusal: false,
         sources
       });
