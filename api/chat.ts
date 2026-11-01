@@ -160,6 +160,40 @@ function buildSpecificFallback(message: string, material: any): string {
   return relevant || 'Guru belum memberikan materi untuk pertanyaan ini.';
 }
 
+function buildDefinitionAnswer(message: string, material: any): string | null {
+  const normalized = message.toLowerCase();
+  const source = [
+    material.summary || '',
+    material.content || '',
+    material.faq || ''
+  ].filter(Boolean).join('\n\n');
+
+  if (/\b(subnetting)\b/i.test(normalized) && /\b(apa itu|lalu apa|apa sih)\b/i.test(normalized)) {
+    const summary = String(material.summary || '').trim();
+    if (summary && /subnetting/i.test(summary)) {
+      return `Berdasarkan materi guru:\n\n${summary}`;
+    }
+  }
+
+  if (/ip(v4)?\b|ip\/4/.test(normalized) && /berapa|terdiri|bit|oktet/.test(normalized)) {
+    const paragraph = source.split(/\n\s*\n/)
+      .map((item: string) => item.replace(/\s+/g, ' ').trim())
+      .find((item: string) => /ipv4/i.test(item) && /32 bit/i.test(item) && /4 oktet/i.test(item));
+    if (paragraph) return `Berdasarkan materi guru:\n\n${paragraph}`;
+  }
+
+  const definitionMatch = normalized.match(/\bapa itu\s+([a-z][a-z0-9 +_-]{2,40})\??$/i);
+  if (definitionMatch) {
+    const concept = definitionMatch[1].trim();
+    const paragraph = source.split(/\n\s*\n/)
+      .map((item: string) => item.replace(/\s+/g, ' ').trim())
+      .find((item: string) => item.toLowerCase().includes(concept));
+    if (paragraph) return `Berdasarkan materi guru:\n\n${paragraph}`;
+  }
+
+  return null;
+}
+
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', req.headers?.origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -279,6 +313,7 @@ export default async function handler(req: any, res: any) {
       const linkedQuestions = questions.filter((question: any) => resolvedIds.includes(question.id));
       const answer = `Berdasarkan kuis terbitkan guru:\n\n**${quiz.title}**\nKategori: ${quiz.category || '-'}\nJumlah soal: ${linkedQuestions.length || resolvedIds.length || 0}\n\n${quiz.description || 'Gunakan paket kuis ini untuk latihan berdasarkan materi yang telah dipelajari.'}`;
       return res.status(200).json({
+        answer,
         isRefusal: false,
         sources: [{
           title: quiz.title,
@@ -401,6 +436,15 @@ export default async function handler(req: any, res: any) {
       primaryMaterial.practice_steps || '',
       primaryMaterial.faq || ''
     ].filter(Boolean).join('\n\n');
+
+    const definitionAnswer = buildDefinitionAnswer(message, primaryMaterial);
+    if (definitionAnswer) {
+      return res.status(200).json({
+        answer: definitionAnswer,
+        isRefusal: false,
+        sources
+      });
+    }
 
     if (/\brange\b/i.test(normalizeQuery(message))) {
       const rangeParagraph = sourceContent
