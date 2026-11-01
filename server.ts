@@ -94,7 +94,7 @@ function optionalTeacherAuth(req: AuthenticatedRequest, res: Response, next: Nex
 app.post('/api/chat', rateLimiter(40, 60000), async (req: Request, res: Response) => {
   try {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-    res.setHeader('X-INFORA-Chat-Version', 'chat-retrieval-live-2026-11-01');
+    res.setHeader('X-INFORA-Chat-Version', 'chat-retrieval-live-2026-11-01-portal-fix');
     const { message, history } = req.body;
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
       return res.status(400).json({ error: 'Pesan pertanyaan tidak boleh kosong.' });

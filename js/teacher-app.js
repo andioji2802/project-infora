@@ -67,7 +67,7 @@ class TeacherApp {
         try {
           const res = await fetch(apiUrl('/api/auth-reset'), {
             method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(identifier.includes('@') ? { email: identifier.trim() } : { nip: identifier.trim() })
           });
           const data = await res.json().catch(() => ({}));
@@ -208,10 +208,15 @@ class TeacherApp {
     if (logoutBtn) {
       logoutBtn.addEventListener('click', async () => {
         if (confirm('Keluar dari portal guru?')) {
-          await logoutTeacher();
-          this.user = null;
-          showToast('Anda telah keluar.', 'info');
-          this.showAuth();
+          try {
+            await logoutTeacher();
+          } catch (err) {
+            console.error('Logout API gagal, sesi lokal tetap dibersihkan:', err);
+          } finally {
+            this.user = null;
+            showToast('Anda telah keluar.', 'info');
+            this.showAuth();
+          }
         }
       });
     }
@@ -345,6 +350,7 @@ class TeacherApp {
       const token = getAuthToken();
       const res = await fetch(apiUrl('/api/stats'), {
         headers: { 'Authorization': 'Bearer ' + token },
+        cache: 'no-store'
       });
       if (res.ok) {
         const stats = await res.json();
@@ -357,8 +363,13 @@ class TeacherApp {
         if (statPub) statPub.textContent = stats.publishedMaterials || 0;
         if (statQ) statQ.textContent = stats.totalQuestions || 0;
         if (statChunks) statChunks.textContent = stats.totalChunks || 0;
+      } else {
+        const data = await res.json().catch(() => ({}));
+        console.error('Gagal memuat statistik dashboard:', data.error || res.status);
       }
-    } catch (e) {}
+    } catch (error) {
+      console.error('Dashboard tidak dapat mengambil statistik:', error);
+    }
   }
 
   loadProfileForm() {
@@ -386,7 +397,7 @@ class TeacherApp {
       const res = await fetch(apiUrl('/api/auth-profile'), {
         method: 'PUT',
         headers: {
-          'Content-Type': 'text/plain;charset=UTF-8',
+          'Content-Type': 'application/json',
           'Authorization': 'Bearer ' + token
         },
         body: JSON.stringify(payload)
@@ -397,7 +408,12 @@ class TeacherApp {
 
       this.user = data.user;
       showToast('Profil guru berhasil diperbarui!', 'success');
-      this.showDashboard();
+      const nameEl = document.getElementById('sidebar-user-name');
+      const roleEl = document.getElementById('sidebar-user-role');
+      if (nameEl) nameEl.textContent = this.user.full_name || 'Guru Informatika';
+      if (roleEl) roleEl.textContent = `${this.user.school_name || 'SMK'} • ${this.user.role || 'Teacher'}`;
+      this.loadProfileForm();
+      await this.refreshStats();
     } catch (err) {
       showToast(err.message, 'error');
     }

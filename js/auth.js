@@ -14,10 +14,14 @@ export function setAuthToken(token) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
+export function clearAuthToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
 export async function loginTeacher(nip, password) {
   const res = await fetch(apiUrl('/api/auth-login'), {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ nip, password })
   });
   const data = await res.json().catch(() => ({}));
@@ -30,7 +34,7 @@ export async function loginTeacher(nip, password) {
 export async function registerTeacher(userData) {
   const res = await fetch(apiUrl('/api/auth-register'), {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(userData)
   });
   const data = await res.json().catch(() => ({}));

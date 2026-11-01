@@ -294,7 +294,7 @@ export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-  res.setHeader('X-INFORA-Chat-Version', 'chat-retrieval-live-2026-11-01');
+  res.setHeader('X-INFORA-Chat-Version', 'chat-retrieval-live-2026-11-01-portal-fix');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method tidak diizinkan.' });
   try {

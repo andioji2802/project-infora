@@ -4,6 +4,7 @@ import { getSupabaseConfig, supabaseRequest } from '../server/supabase.js';
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', req.headers?.origin || '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'PUT,OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'PUT') return res.status(405).json({ error: 'Method tidak diizinkan.' });
   const auth = req.headers?.authorization || '';
