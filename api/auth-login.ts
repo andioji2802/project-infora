@@ -11,19 +11,23 @@ export default async function handler(req: any, res: any) {
   const nip = String(body.nip || body.NIP || body.username || '').trim();
   const supabase = getSupabaseConfig();
   if (supabase) {
-    const query = nip
+    const query: Record<string, string> = nip
       ? { teacher_identifier: `eq.${nip}`, select: '*' }
       : { email: `eq.${String(body.email || '').trim().toLowerCase()}`, select: '*' };
     const found = await supabaseRequest('profiles', { query });
+    if (found.error) return res.status(500).json({ error: found.error });
     const profile = found.data[0];
     if (!profile || !verifyPassword(String(body.password || ''), profile.password_hash, profile.password_salt)) {
       return res.status(401).json({ error: 'NIP/ID guru atau kata sandi tidak cocok.' });
     }
     const token = crypto.randomBytes(32).toString('hex');
-    await supabaseRequest('app_sessions', {
+    const session = await supabaseRequest('app_sessions', {
       method: 'POST',
       body: { token, user_id: profile.id, expires_at: new Date(Date.now() + 7 * 86400000).toISOString() }
     });
+    if (session.error || !session.data.length) {
+      return res.status(500).json({ error: session.error || 'Gagal membuat sesi Supabase.' });
+    }
     const { password_hash, password_salt, ...user } = profile;
     return res.status(200).json({ token, user });
   }
