@@ -1,5 +1,6 @@
 import { db } from '../server/db.js';
 import { parseRequestBody } from '../server/http.js';
+import { getSupabaseConfig, supabaseRequest } from '../server/supabase.js';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', req.headers?.origin || '*');
@@ -12,7 +13,11 @@ export default async function handler(req: any, res: any) {
     const message = typeof body.message === 'string' ? body.message.trim() : '';
     if (!message) return res.status(400).json({ error: 'Pesan pertanyaan tidak boleh kosong.' });
 
-    const materials = db.getMaterials('published');
+    let materials: any[] = db.getMaterials('published');
+    if (getSupabaseConfig()) {
+      const result = await supabaseRequest('materials', { query: { status: 'eq.published', select: '*' } });
+      if (result.data.length) materials = result.data.map((row: any) => ({ ...row, content: row.content || '' }));
+    }
     const stopWords = new Set(['apa','yang','untuk','dengan','tentang','bagaimana','cara','jelaskan','perbedaan','dan','atau','materi','konsep','dasar']);
     const words: string[] = message.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/).filter((w: string) => w.length > 2 && !stopWords.has(w));
     const scored = materials.map(material => {

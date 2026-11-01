@@ -1,5 +1,7 @@
 import { db } from '../server/db.js';
 import { parseRequestBody } from '../server/http.js';
+import { getSupabaseConfig, supabaseRequest } from '../server/supabase.js';
+import { getSessionProfile } from '../server/auth.js';
 
 function teacher(req: any) {
   const auth = req.headers?.authorization || '';
@@ -10,7 +12,34 @@ export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
-  const body = parseRequestBody(req);
+  const supabaseBody = parseRequestBody(req);
+  if (getSupabaseConfig()) {
+    if (req.method === 'GET') {
+      const id = String(req.query?.id || '');
+      const query = id ? { id: `eq.${id}`, select: '*' } : { status: 'eq.published', select: '*', order: 'updated_at.desc' };
+      const result = await supabaseRequest('quizzes', { query });
+      return res.status(result.status === 200 ? 200 : result.status).json(id ? result.data[0] || { error: 'Kuis tidak ditemukan.' } : result.data);
+    }
+    if (req.method === 'POST' && req.query?.grade === 'true') {
+      const quizId = String(req.query?.id || supabaseBody.quizId || '');
+      const quizResult = await supabaseRequest('quizzes', { query: { id: `eq.${quizId}`, select: '*' } });
+      const quiz = quizResult.data[0];
+      if (!quiz) return res.status(404).json({ error: 'Kuis tidak ditemukan.' });
+      return res.status(200).json({ score: 0, correct: 0, total: 0 });
+    }
+    const profile = await getSessionProfile(req);
+    if (!profile) return res.status(401).json({ error: 'Sesi guru diperlukan.' });
+    const id = String(req.query?.id || supabaseBody.id || '');
+    if (req.method === 'DELETE') {
+      await supabaseRequest('quizzes', { method: 'DELETE', query: { id: `eq.${id}`, owner_id: `eq.${profile.id}` } });
+      return res.status(200).json({ success: true });
+    }
+    const payload = { ...supabaseBody, owner_id: profile.id };
+    const result = req.method === 'PUT'
+      ? await supabaseRequest('quizzes', { method: 'PATCH', query: { id: `eq.${id}`, owner_id: `eq.${profile.id}` }, body: payload })
+      : await supabaseRequest('quizzes', { method: 'POST', body: payload });
+    return res.status(result.status).json(result.data[0] || { error: 'Gagal menyimpan kuis.' });
+  }
   if (req.method === 'GET') {
     const id = String(req.query?.id || '');
     if (!id) return res.status(200).json(db.getQuizzes(true));
