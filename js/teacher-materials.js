@@ -278,7 +278,7 @@ export class TeacherMaterialsManager {
   async saveMaterial(data, materialId = null) {
     try {
       const token = getAuthToken();
-      const url = materialId ? `/api/materials/${materialId}` : '/api/materials';
+      const url = materialId ? `/api/materials?id=${encodeURIComponent(materialId)}` : '/api/materials';
       const method = materialId ? 'PUT' : 'POST';
 
       const res = await fetch(apiUrl(url), {
@@ -304,7 +304,7 @@ export class TeacherMaterialsManager {
   async deleteMaterial(materialId) {
     try {
       const token = getAuthToken();
-      const res = await fetch(apiUrl(`/api/materials/${materialId}`), {
+      const res = await fetch(apiUrl(`/api/materials?id=${encodeURIComponent(materialId)}`), {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

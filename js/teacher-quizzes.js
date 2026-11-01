@@ -226,7 +226,7 @@ export class TeacherQuizzesManager {
   async saveQuiz(data, quizId = null) {
     try {
       const token = getAuthToken();
-      const url = quizId ? `/api/quizzes/${quizId}` : '/api/quizzes';
+      const url = quizId ? `/api/quizzes?id=${encodeURIComponent(quizId)}` : '/api/quizzes';
       const method = quizId ? 'PUT' : 'POST';
 
       const res = await fetch(apiUrl(url), {
@@ -252,7 +252,7 @@ export class TeacherQuizzesManager {
   async deleteQuiz(id) {
     try {
       const token = getAuthToken();
-      const res = await fetch(apiUrl(`/api/quizzes/${id}`), {
+      const res = await fetch(apiUrl(`/api/quizzes?id=${encodeURIComponent(id)}`), {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

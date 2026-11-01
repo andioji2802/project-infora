@@ -34,13 +34,13 @@ export async function fetchPublicQuizzes() {
 }
 
 export async function fetchQuizDetail(quizId) {
-  const res = await fetch(apiUrl(`/api/quizzes/${quizId}`));
+  const res = await fetch(apiUrl(`/api/quizzes?id=${encodeURIComponent(quizId)}`));
   if (!res.ok) throw new Error('Gagal memuat detail kuis');
   return await res.json();
 }
 
 export async function submitQuizAnswers(quizId, answers) {
-  const res = await fetch(apiUrl(`/api/quizzes/${quizId}/grade`), {
+  const res = await fetch(apiUrl(`/api/quizzes?id=${encodeURIComponent(quizId)}&grade=true`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ answers })

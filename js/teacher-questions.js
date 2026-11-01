@@ -216,7 +216,7 @@ export class TeacherQuestionsManager {
   async saveQuestion(data, questionId = null) {
     try {
       const token = getAuthToken();
-      const url = questionId ? `/api/questions/${questionId}` : '/api/questions';
+      const url = questionId ? `/api/questions?id=${encodeURIComponent(questionId)}` : '/api/questions';
       const method = questionId ? 'PUT' : 'POST';
 
       const res = await fetch(apiUrl(url), {
@@ -242,7 +242,7 @@ export class TeacherQuestionsManager {
   async deleteQuestion(id) {
     try {
       const token = getAuthToken();
-      const res = await fetch(apiUrl(`/api/questions/${id}`), {
+      const res = await fetch(apiUrl(`/api/questions?id=${encodeURIComponent(id)}`), {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
