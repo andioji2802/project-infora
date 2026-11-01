@@ -1,5 +1,5 @@
 import { db } from '../server/db.js';
-export const config = { api: { bodyParser: false } };
+
 function teacher(req: any) {
   const auth = req.headers?.authorization || '';
   return auth.startsWith('Bearer ') ? db.getUserFromSession(auth.slice(7)) : null;
@@ -9,13 +9,6 @@ export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
-  if (!req.body && ['POST', 'PUT', 'DELETE'].includes(req.method) && typeof req[Symbol.asyncIterator] === 'function') {
-    let raw = '';
-    for await (const chunk of req) raw += Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk);
-    if (raw.trim()) {
-      try { req.body = JSON.parse(raw); } catch { return res.status(400).json({ error: 'Format JSON tidak valid.' }); }
-    }
-  }
   const profile = teacher(req);
   if (req.method === 'GET') return res.status(200).json(profile ? db.getMaterials() : db.getMaterials('published'));
   if (!profile) return res.status(401).json({ error: 'Sesi guru diperlukan.' });

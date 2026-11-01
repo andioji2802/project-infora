@@ -1,11 +1,4 @@
-export const config = { api: { bodyParser: false } };
-
 export default async function handler(req: any, res: any) {
-  if (!req.body && typeof req[Symbol.asyncIterator] === 'function') {
-    let raw = '';
-    for await (const chunk of req) raw += Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk);
-    if (raw.trim()) req.body = JSON.parse(raw);
-  }
   res.setHeader('Access-Control-Allow-Origin', req.headers?.origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
