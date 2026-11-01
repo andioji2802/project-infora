@@ -37,7 +37,7 @@ const CHAT_STOP_WORDS = new Set([
   'apa', 'itu', 'ini', 'yang', 'untuk', 'dengan', 'tentang', 'bagaimana',
   'cara', 'jelaskan', 'materi', 'konsep', 'dasar', 'gimana', 'nih', 'dong',
   'sih', 'ya', 'bro', 'maksud', 'tolong', 'beri', 'berikan', 'kasih',
-  'data', 'basis', 'relasional', 'struktur', 'program', 'fungsi'
+  'data', 'basis', 'database', 'relasional', 'struktur', 'program', 'fungsi'
 ]);
 
 export function getChatTokens(text: string): string[] {
@@ -68,18 +68,16 @@ export function rankMaterialsForChat(message: string, materials: any[]): Array<{
     if (languageMismatch) return { material, score: 0 };
     let score = 0;
     let strongMatches = 0;
-    let specificContentMatches = 0;
-    for (const token of tokens) {
+      for (const token of tokens) {
       if (String(material.title || '').toLowerCase().includes(token)) { score += 8; strongMatches += 1; }
       if (String(material.keywords || '').toLowerCase().includes(token)) { score += 6; strongMatches += 1; }
       if (String(material.aliases || '').toLowerCase().includes(token)) { score += 5; strongMatches += 1; }
       if (String(material.summary || '').toLowerCase().includes(token)) { score += 3; strongMatches += 1; }
       if (String(material.content || '').toLowerCase().includes(token)) {
         score += 1;
-        if (token.length >= 5) specificContentMatches += 1;
       }
     }
-    if (strongMatches === 0 && specificContentMatches < 2) return { material, score: 0 };
+    if (strongMatches === 0) return { material, score: 0 };
     return { material, score };
   }).filter(item => item.score >= 4).sort((a, b) => b.score - a.score);
 }
