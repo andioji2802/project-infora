@@ -79,7 +79,12 @@ function detectLanguages(text: string): string[] {
 }
 
 function extractRelevantSections(material: any, message: string, limit = 1800): string {
-  const source = `${material.summary || ''}\n\n${material.content || ''}`;
+  const source = [
+    material.content || '',
+    material.examples || '',
+    material.practice_steps || '',
+    material.faq || ''
+  ].filter(Boolean).join('\n\n');
   const headingPattern = /(?=^#{1,4}\s+)/m;
   const sections = source
     .split(headingPattern)
@@ -354,6 +359,64 @@ export default async function handler(req: any, res: any) {
       teacher_name: material.teacher_name || 'Guru Informatika',
       summary: material.summary
     }));
+
+    const primaryMaterial = strongestContexts[0].material;
+    const sourceContent = [
+      primaryMaterial.summary || '',
+      primaryMaterial.content || '',
+      primaryMaterial.examples || '',
+      primaryMaterial.practice_steps || '',
+      primaryMaterial.faq || ''
+    ].filter(Boolean).join('\n\n');
+
+    if (/\brange\b/i.test(normalizeQuery(message))) {
+      const rangeParagraph = sourceContent
+        .split(/\n\s*\n/)
+        .map((paragraph: string) => paragraph.replace(/\s+/g, ' ').trim())
+        .find((paragraph: string) => /\brange\s*\(/i.test(paragraph) || /\brange\b/i.test(paragraph));
+      if (!rangeParagraph) {
+        return res.status(200).json({
+          answer: 'Guru belum memberikan penjelasan khusus tentang `range` dalam materi yang tersedia.',
+          isRefusal: true,
+          sources
+        });
+      }
+      return res.status(200).json({
+        answer: `Berdasarkan materi guru:\n\n${rangeParagraph}`,
+        isRefusal: false,
+        sources
+      });
+    }
+
+    if (/kenapa|mengapa/i.test(message) && /\b(loop|perulangan|looping)\b/i.test(normalizeQuery(message))) {
+      const lines = sourceContent.split(/\n/).map((line: string) => line.trim()).filter(Boolean);
+      const whyIndex = lines.findIndex((line: string) => /mengapa|kenapa|dibutuhkan/i.test(line) && /loop|perulangan/i.test(line));
+      let whyText = '';
+      if (whyIndex >= 0) {
+        whyText = lines.slice(whyIndex, whyIndex + 4).join('\n');
+      } else {
+        const whyParagraph = sourceContent.split(/\n\s*\n/)
+          .map((paragraph: string) => paragraph.replace(/\s+/g, ' ').trim())
+          .find((paragraph: string) => /loop|perulangan/i.test(paragraph) && /ulang|efisiens|instruksi/i.test(paragraph));
+        whyText = whyParagraph || '';
+      }
+      if (whyText) {
+        return res.status(200).json({
+          answer: `Berdasarkan materi guru:\n\n${whyText}`,
+          isRefusal: false,
+          sources
+        });
+      }
+    }
+
+    if (/contoh\s+(soal|latihan)/i.test(message) && !/\b(jawab|jawaban|kunci|pilihan ganda)\b/i.test(message)) {
+      const title = primaryMaterial.title || 'materi yang dipelajari';
+      return res.status(200).json({
+        answer: `Contoh soal dari materi **${title}**:\n\n1. Jelaskan poin utama yang dijelaskan materi ini dengan kata-katamu sendiri.\n2. Berikan satu contoh penerapan konsep tersebut dalam kehidupan sehari-hari.\n3. Buat satu contoh kasus singkat berdasarkan materi, lalu jelaskan langkah penyelesaiannya.`,
+        isRefusal: false,
+        sources
+      });
+    }
 
     const apiKey = process.env.GEMINI_API_KEY?.trim() || process.env.GEMINI_API_INFORA?.trim();
     if (!apiKey) {
