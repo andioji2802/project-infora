@@ -36,7 +36,26 @@ export default async function handler(req: any, res: any) {
 
   const path = new URL(req.url || '/', 'https://project-infora.vercel.app').pathname.replace(/\/$/, '');
   const method = req.method || 'GET';
-  const body = req.body || {};
+  let body = req.body || {};
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch {
+      return res.status(400).json({ error: 'Format JSON tidak valid.' });
+    }
+  } else if (Buffer.isBuffer(body)) {
+    try {
+      body = JSON.parse(body.toString('utf8'));
+    } catch {
+      return res.status(400).json({ error: 'Format JSON tidak valid.' });
+    }
+  } else if (req.rawBody) {
+    try {
+      body = JSON.parse(Buffer.isBuffer(req.rawBody) ? req.rawBody.toString('utf8') : String(req.rawBody));
+    } catch {
+      // Use the parsed object when Vercel has already parsed the body.
+    }
+  }
 
   try {
     if (path === '/api/health' && method === 'GET') {
