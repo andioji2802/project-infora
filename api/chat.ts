@@ -2,6 +2,7 @@ import { db } from '../server/db.js';
 import { parseRequestBody } from '../server/http.js';
 import { getSupabaseConfig, supabaseRequest } from '../server/supabase.js';
 import { evaluateTopicScope, EXACT_REFUSAL_MESSAGE } from '../server/topicFilter.js';
+import { createEmbeddingVector } from '../server/ai.js';
 
 function normalizeQuery(text: string): string {
   return text.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -255,6 +256,39 @@ export function buildDefinitionAnswer(message: string, material: any): string | 
   return null;
 }
 
+async function ensureSupabaseChunks(materials: any[]): Promise<void> {
+  if (!getSupabaseConfig()) return;
+  for (const material of materials) {
+    if (!material?.id) continue;
+    const existing = await supabaseRequest('material_chunks', {
+      query: { material_id: `eq.${material.id}`, select: 'id', limit: '1' }
+    });
+    if (existing.data.length) continue;
+    const source = [
+      `Judul: ${material.title || ''}`,
+      `Kategori: ${material.category || ''}`,
+      material.summary || '',
+      material.learning_objectives || '',
+      material.content || '',
+      material.examples || '',
+      material.practice_steps || '',
+      material.faq || '',
+      material.keywords || '',
+      material.aliases || ''
+    ].filter(Boolean).join('\n\n');
+    const chunks = source.split(/\n\s*\n/).map((chunk: string) => chunk.trim()).filter(Boolean);
+    if (!chunks.length) continue;
+    const rows = await Promise.all(chunks.map(async (chunk_text: string, chunk_index: number) => ({
+      material_id: material.id,
+      chunk_index,
+      chunk_text,
+      embedding: await createEmbeddingVector(chunk_text),
+      embedding_model: 'gemini-embedding-2-preview'
+    })));
+    await supabaseRequest('material_chunks', { method: 'POST', body: rows });
+  }
+}
+
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', req.headers?.origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -267,6 +301,13 @@ export default async function handler(req: any, res: any) {
     const body = parseRequestBody(req);
     const message = typeof body.message === 'string' ? body.message.trim() : '';
     if (!message) return res.status(400).json({ error: 'Pesan pertanyaan tidak boleh kosong.' });
+    if (/^(hai|halo|hi|hello|selamat pagi|selamat siang|selamat sore|selamat malam)[!.\s]*$/i.test(message)) {
+      return res.status(200).json({
+        answer: 'Halo! Silakan tanyakan materi Informatika yang ingin kamu pahami, misalnya coding, jaringan, basis data, algoritma, atau sistem komputer.',
+        isRefusal: false,
+        sources: []
+      });
+    }
     const scope = evaluateTopicScope(message);
     const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
     if (!scope.allowed) {
@@ -289,6 +330,7 @@ export default async function handler(req: any, res: any) {
       const result = await supabaseRequest('materials', { query: { status: 'eq.published', select: '*' } });
       if (result.data.length) materials = result.data.map((row: any) => ({ ...row, content: row.content || '' }));
     }
+    await ensureSupabaseChunks(materials);
     const intent = classifyChatIntent(message);
 
     if (intent === 'question_quiz') {

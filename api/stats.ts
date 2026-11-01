@@ -9,10 +9,10 @@ export default async function handler(req: any, res: any) {
     const profile = await getSessionProfile(req);
     if (!profile) return res.status(401).json({ error: 'Sesi guru diperlukan.' });
     const [materials, published, questions, quizzes, chunks] = await Promise.all([
-      supabaseRequest('materials', { query: { select: 'id' } }),
-      supabaseRequest('materials', { query: { status: 'eq.published', select: 'id' } }),
-      supabaseRequest('questions', { query: { select: 'id' } }),
-      supabaseRequest('quizzes', { query: { select: 'id' } }),
+      supabaseRequest('materials', { query: { owner_id: `eq.${profile.id}`, select: 'id' } }),
+      supabaseRequest('materials', { query: { owner_id: `eq.${profile.id}`, status: 'eq.published', select: 'id' } }),
+      supabaseRequest('questions', { query: { owner_id: `eq.${profile.id}`, select: 'id' } }),
+      supabaseRequest('quizzes', { query: { owner_id: `eq.${profile.id}`, select: 'id' } }),
       supabaseRequest('material_chunks', { query: { select: 'id' } })
     ]);
     return res.status(200).json({
