@@ -223,10 +223,14 @@ export default async function handler(req: any, res: any) {
       const linkedIds = Array.isArray(quiz.question_ids)
         ? quiz.question_ids
         : (typeof quiz.question_ids === 'string' ? (() => { try { return JSON.parse(quiz.question_ids || '[]'); } catch { return []; } })() : []);
-      const linkedQuestions = questions.filter((question: any) => linkedIds.includes(question.id));
-      const answer = `Berdasarkan kuis terbitkan guru:\n\n**${quiz.title}**\nKategori: ${quiz.category || '-'}\nJumlah soal: ${linkedQuestions.length || linkedIds.length || 0}\n\n${quiz.description || 'Gunakan paket kuis ini untuk latihan berdasarkan materi yang telah dipelajari.'}`;
+      let resolvedIds = linkedIds;
+      if (!resolvedIds.length && getSupabaseConfig()) {
+        const pivot = await supabaseRequest('quiz_questions', { query: { quiz_id: `eq.${quiz.id}`, select: 'question_id,position', order: 'position.asc' } });
+        resolvedIds = pivot.data.map((item: any) => item.question_id).filter(Boolean);
+      }
+      const linkedQuestions = questions.filter((question: any) => resolvedIds.includes(question.id));
+      const answer = `Berdasarkan kuis terbitkan guru:\n\n**${quiz.title}**\nKategori: ${quiz.category || '-'}\nJumlah soal: ${linkedQuestions.length || resolvedIds.length || 0}\n\n${quiz.description || 'Gunakan paket kuis ini untuk latihan berdasarkan materi yang telah dipelajari.'}`;
       return res.status(200).json({
-        answer,
         isRefusal: false,
         sources: [{
           title: quiz.title,

@@ -26,10 +26,15 @@ export default async function handler(req: any, res: any) {
       const ids = Array.isArray(quiz.question_ids)
         ? quiz.question_ids
         : (typeof quiz.question_ids === 'string' ? (() => { try { return JSON.parse(quiz.question_ids || '[]'); } catch { return []; } })() : []);
-      const questionsResult = ids.length
-        ? await supabaseRequest('questions', { query: { id: `in.(${ids.join(',')})`, status: 'eq.published', select: '*' } })
+      let resolvedIds = ids;
+      if (!resolvedIds.length) {
+        const pivot = await supabaseRequest('quiz_questions', { query: { quiz_id: `eq.${quiz.id}`, select: 'question_id,position', order: 'position.asc' } });
+        resolvedIds = pivot.data.map((item: any) => item.question_id).filter(Boolean);
+      }
+      const questionsResult = resolvedIds.length
+        ? await supabaseRequest('questions', { query: { id: `in.(${resolvedIds.join(',')})`, status: 'eq.published', select: '*' } })
         : { data: [] };
-      const questions = ids.map((questionId: string) =>
+      const questions = resolvedIds.map((questionId: string) =>
         questionsResult.data.find((question: any) => question.id === questionId)
       ).filter(Boolean);
       return res.status(200).json({ ...quiz, questions });
@@ -42,13 +47,18 @@ export default async function handler(req: any, res: any) {
       const ids = Array.isArray(quiz.question_ids)
         ? quiz.question_ids
         : (typeof quiz.question_ids === 'string' ? (() => { try { return JSON.parse(quiz.question_ids || '[]'); } catch { return []; } })() : []);
-      const questionsResult = ids.length
-        ? await supabaseRequest('questions', { query: { id: `in.(${ids.join(',')})`, status: 'eq.published', select: '*' } })
+      let resolvedIds = ids;
+      if (!resolvedIds.length) {
+        const pivot = await supabaseRequest('quiz_questions', { query: { quiz_id: `eq.${quizId}`, select: 'question_id,position', order: 'position.asc' } });
+        resolvedIds = pivot.data.map((item: any) => item.question_id).filter(Boolean);
+      }
+      const questionsResult = resolvedIds.length
+        ? await supabaseRequest('questions', { query: { id: `in.(${resolvedIds.join(',')})`, status: 'eq.published', select: '*' } })
         : { data: [] };
       const answers = supabaseBody.answers || {};
       let correctCount = 0;
       const results: any[] = [];
-      for (const question of (ids.map((questionId: string) =>
+      for (const question of (resolvedIds.map((questionId: string) =>
         questionsResult.data.find((item: any) => item.id === questionId)
       ).filter(Boolean) as any[])) {
         const userAnswer = Number(answers[question.id]);
