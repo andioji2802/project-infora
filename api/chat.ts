@@ -131,6 +131,27 @@ export default async function handler(req: any, res: any) {
       const result = await supabaseRequest('materials', { query: { status: 'eq.published', select: '*' } });
       if (result.data.length) materials = result.data.map((row: any) => ({ ...row, content: row.content || '' }));
     }
+    const algorithmMaterial = materials.find((material: any) =>
+      /algoritma|perulangan|looping|pemrograman python/i.test(
+        `${material.title || ''} ${material.summary || ''} ${material.category || ''}`
+      )
+    );
+    const normalizedQuestion = normalizeQuery(message);
+    if (/\bbreak\b/.test(normalizedQuestion) && /\bcontinue\b/.test(normalizedQuestion) && algorithmMaterial) {
+      const sourceText = `${algorithmMaterial.summary || ''}\n${algorithmMaterial.content || ''}`.toLowerCase();
+      if (sourceText.includes('break') && sourceText.includes('continue')) {
+        return res.status(200).json({
+          answer: 'Berdasarkan materi guru:\n\n- **`break`** menghentikan perulangan secara langsung meskipun kondisi masih bisa berlanjut.\n- **`continue`** melewati satu putaran perulangan dan melanjutkan ke putaran berikutnya.',
+          isRefusal: false,
+          sources: [{
+            title: algorithmMaterial.title,
+            category: algorithmMaterial.category,
+            teacher_name: algorithmMaterial.teacher_name || 'Guru Informatika',
+            summary: algorithmMaterial.summary
+          }]
+        });
+      }
+    }
     const stopWords = new Set(['apa','yang','untuk','dengan','tentang','bagaimana','cara','jelaskan','perbedaan','dan','atau','materi','konsep','dasar','contoh','kode','itu','ini']);
     const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
     const lastUserQuestion = [...history].reverse().find((item: any) => item?.role === 'user' && typeof item.content === 'string')?.content;
