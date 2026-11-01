@@ -224,7 +224,21 @@ export default async function handler(req: any, res: any) {
         ? { id: `eq.${id}`, select: '*' }
         : { status: 'eq.published', select: '*', order: 'updated_at.desc' };
       const result = await supabaseRequest('quizzes', { query });
-      if (!id) return res.status(result.status === 200 ? 200 : result.status).json(result.data);
+      if (!id) {
+        const quizzes = await Promise.all(result.data.map(async (quiz: any) => {
+          const resolved = await resolveQuizQuestionsSupabase(quiz);
+          return {
+            ...quiz,
+            max_score: Number(quiz.max_score) || 100,
+            rubric: quiz.rubric || {},
+            questions: resolved.questions.map((question: any) => {
+              const { correct_answer, explanation, ...publicQuestion } = question;
+              return publicQuestion;
+            })
+          };
+        }));
+        return res.status(result.status === 200 ? 200 : result.status).json(quizzes);
+      }
       const quiz = result.data[0];
       if (!quiz) return res.status(404).json({ error: 'Kuis tidak ditemukan.' });
       const resolved = await resolveQuizQuestionsSupabase(quiz);

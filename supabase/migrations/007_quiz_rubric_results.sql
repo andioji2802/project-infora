@@ -44,11 +44,13 @@ CREATE TABLE IF NOT EXISTS public.quiz_attempt_answers (
 ALTER TABLE public.quiz_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quiz_attempt_answers ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Teacher can view own quiz attempts" ON public.quiz_attempts;
 CREATE POLICY "Teacher can view own quiz attempts"
 ON public.quiz_attempts FOR SELECT
 TO authenticated
 USING (quiz_owner_id = auth.uid());
 
+DROP POLICY IF EXISTS "Teacher can view own quiz attempt answers" ON public.quiz_attempt_answers;
 CREATE POLICY "Teacher can view own quiz attempt answers"
 ON public.quiz_attempt_answers FOR SELECT
 TO authenticated
@@ -59,3 +61,10 @@ USING (
       AND a.quiz_owner_id = auth.uid()
   )
 );
+
+GRANT USAGE ON SCHEMA public TO service_role;
+GRANT ALL ON TABLE public.quizzes TO service_role;
+GRANT ALL ON TABLE public.quiz_questions TO service_role;
+GRANT ALL ON TABLE public.questions TO service_role;
+GRANT ALL ON TABLE public.quiz_attempts TO service_role;
+GRANT ALL ON TABLE public.quiz_attempt_answers TO service_role;
