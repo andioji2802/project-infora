@@ -1,4 +1,11 @@
+export const config = { api: { bodyParser: false } };
+
 export default async function handler(req: any, res: any) {
+  if (!req.body && typeof req[Symbol.asyncIterator] === 'function') {
+    let raw = '';
+    for await (const chunk of req) raw += Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk);
+    if (raw.trim()) req.body = JSON.parse(raw);
+  }
   res.setHeader('Access-Control-Allow-Origin', req.headers?.origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
@@ -25,7 +32,13 @@ export default async function handler(req: any, res: any) {
         })
       }
     );
-    const payload = await response.json();
+    const responseText = await response.text();
+    let payload: any;
+    try {
+      payload = JSON.parse(responseText);
+    } catch {
+      return res.status(502).json({ error: `Gemini mengembalikan respons tidak valid (${response.status}): ${responseText.slice(0, 300)}` });
+    }
     if (!response.ok) {
       return res.status(response.status).json({ error: payload?.error?.message || payload?.error || 'Gemini menolak permintaan.' });
     }
