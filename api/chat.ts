@@ -357,8 +357,13 @@ export default async function handler(req: any, res: any) {
       ? `${lastUserQuestion}\n${message}`
       : message || '';
 
-    if (/^(lalu\s+)?(apa itu|apa sih|apa arti)\s+subnetting\??$/i.test(resolvedMessage.trim()) ||
-        /^subnetting itu apa\??$/i.test(resolvedMessage.trim())) {
+    const normalizedDefinitionRequest = resolvedMessage
+      .trim()
+      .replace(/\s+(bro|sih|dong|nih|ya|tolong)$/i, '')
+      .trim();
+    if (/^(lalu\s+)?(apa itu|apa sih|apa arti)\s+subnetting\??$/i.test(normalizedDefinitionRequest) ||
+        /^subnetting itu apa\??$/i.test(normalizedDefinitionRequest) ||
+        /\b(apa itu|apa sih|apa arti|itu apa)\b/i.test(normalizedDefinitionRequest) && /\bsubnetting\b/i.test(normalizedDefinitionRequest)) {
       const subnetMaterial = materials.find((material: any) =>
         /\bsubnetting\b/i.test(`${material.title || ''} ${material.summary || ''} ${material.keywords || ''} ${material.content || ''}`)
       );
@@ -376,9 +381,12 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    const generalDefinition = resolvedMessage.trim().match(/^(?:apa itu|apa sih|apa arti)\s+(.{2,40})\??$/i);
+    const generalDefinition = normalizedDefinitionRequest.match(/^(?:apa itu|apa sih|apa arti)\s+(.{2,40})\??$/i);
     if (generalDefinition) {
       const concept = generalDefinition[1].trim().toLowerCase();
+      if (/^(range|for|while|break|continue)$/.test(concept)) {
+        // Let the dedicated concept handlers below answer these language/programming terms.
+      } else {
       const exactMaterial = materials.find((material: any) =>
         `${material.title || ''} ${material.keywords || ''}`.toLowerCase().includes(concept)
       );
@@ -393,6 +401,7 @@ export default async function handler(req: any, res: any) {
             summary: exactMaterial.summary
           }]
         });
+      }
       }
     }
 
