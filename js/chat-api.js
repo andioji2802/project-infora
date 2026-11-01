@@ -39,11 +39,17 @@ export async function fetchQuizDetail(quizId) {
   return await res.json();
 }
 
-export async function submitQuizAnswers(quizId, answers) {
+export async function submitQuizAnswers(quizId, answers, identity = {}, idempotencyKey = '') {
   const res = await fetch(apiUrl(`/api/quizzes?id=${encodeURIComponent(quizId)}&grade=true`), {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-    body: JSON.stringify({ answers })
+    body: JSON.stringify({
+      answers,
+      studentName: identity.studentName || '',
+      studentNis: identity.studentNis || '',
+      idempotencyKey,
+      startedAt: identity.startedAt || null
+    })
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

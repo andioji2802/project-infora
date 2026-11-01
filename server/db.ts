@@ -86,8 +86,29 @@ export interface QuizItem {
   difficulty: string;
   status: 'draft' | 'published';
   question_ids: string[];
+  max_score?: number;
+  rubric?: Record<string, number>;
   created_at: string;
   updated_at?: string;
+}
+
+export interface QuizAttemptItem {
+  id: string;
+  quiz_id: string;
+  quiz_owner_id: string;
+  student_name: string;
+  student_nis: string;
+  answers: Record<string, number>;
+  correct_count: number;
+  wrong_count: number;
+  total_questions: number;
+  score: number;
+  max_score: number;
+  rubric_snapshot: Record<string, number>;
+  idempotency_key: string;
+  results: any[];
+  started_at?: string;
+  finished_at: string;
 }
 
 interface DatabaseSchema {
@@ -96,6 +117,7 @@ interface DatabaseSchema {
   material_chunks: MaterialChunk[];
   questions: QuestionItem[];
   quizzes: QuizItem[];
+  quiz_attempts: QuizAttemptItem[];
   sessions: { token: string; user_id: string; expires_at: number }[];
 }
 
@@ -125,7 +147,16 @@ class InforaDatabase {
     if (fs.existsSync(DB_FILE)) {
       try {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        parsed.quiz_attempts = Array.isArray(parsed.quiz_attempts) ? parsed.quiz_attempts : [];
+        parsed.quizzes = Array.isArray(parsed.quizzes)
+          ? parsed.quizzes.map((quiz: QuizItem) => ({
+              ...quiz,
+              max_score: Number(quiz.max_score) > 0 ? Number(quiz.max_score) : 100,
+              rubric: quiz.rubric && typeof quiz.rubric === 'object' ? quiz.rubric : {}
+            }))
+          : [];
+        return parsed;
       } catch (err) {
         console.error('Failed to parse infora.json, reinitializing seed data', err);
       }
@@ -152,7 +183,12 @@ class InforaDatabase {
       materials,
       material_chunks: [],
       questions: INITIAL_QUESTIONS as any,
-      quizzes: INITIAL_QUIZZES as any,
+      quizzes: INITIAL_QUIZZES.map((quiz: any) => ({
+        ...quiz,
+        max_score: quiz.max_score || 100,
+        rubric: quiz.rubric || {}
+      })) as any,
+      quiz_attempts: [],
       sessions: []
     };
 
@@ -379,8 +415,31 @@ class InforaDatabase {
   deleteQuiz(id: string): boolean {
     const initLen = this.data.quizzes.length;
     this.data.quizzes = this.data.quizzes.filter(q => q.id !== id);
+    this.data.quiz_attempts = this.data.quiz_attempts.filter(attempt => attempt.quiz_id !== id);
     this.save();
     return this.data.quizzes.length < initLen;
+  }
+
+  saveQuizAttempt(attempt: QuizAttemptItem): QuizAttemptItem {
+    const existing = this.data.quiz_attempts.find(item =>
+      item.quiz_id === attempt.quiz_id && item.idempotency_key === attempt.idempotency_key
+    );
+    if (existing) return existing;
+    this.data.quiz_attempts.push(attempt);
+    this.save();
+    return attempt;
+  }
+
+  getQuizAttemptByIdempotency(quizId: string, idempotencyKey: string): QuizAttemptItem | undefined {
+    return this.data.quiz_attempts.find(item =>
+      item.quiz_id === quizId && item.idempotency_key === idempotencyKey
+    );
+  }
+
+  getQuizAttempts(quizId: string, ownerId?: string): QuizAttemptItem[] {
+    return this.data.quiz_attempts
+      .filter(item => item.quiz_id === quizId && (!ownerId || item.quiz_owner_id === ownerId))
+      .sort((a, b) => String(b.finished_at).localeCompare(String(a.finished_at)));
   }
 }
 

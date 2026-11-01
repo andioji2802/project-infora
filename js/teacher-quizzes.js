@@ -70,6 +70,9 @@ export class TeacherQuizzesManager {
                 <button class="btn-icon btn-edit-quiz" title="Edit Kuis" data-id="${q.id}">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                 </button>
+                <button class="btn-icon btn-results-quiz" title="Lihat Hasil" data-id="${q.id}">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"></path><path d="M7 16v-5"></path><path d="M12 16V8"></path><path d="M17 16v-7"></path></svg>
+                </button>
                 <button class="btn-icon danger btn-delete-quiz" title="Hapus Kuis" data-id="${q.id}">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                 </button>
@@ -86,6 +89,9 @@ export class TeacherQuizzesManager {
   }
 
   bindActions() {
+    document.querySelectorAll('.btn-results-quiz').forEach(btn => {
+      btn.addEventListener('click', () => this.openResultsModal(btn.getAttribute('data-id')));
+    });
     document.querySelectorAll('.btn-edit-quiz').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-id');
@@ -102,6 +108,67 @@ export class TeacherQuizzesManager {
         }
       });
     });
+  }
+
+  async openResultsModal(quizId) {
+    try {
+      const token = getAuthToken();
+      const res = await fetch(apiUrl(`/api/quizzes?id=${encodeURIComponent(quizId)}&results=true`), {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal memuat hasil kuis');
+
+      const modal = document.createElement('div');
+      modal.className = 'modal-backdrop';
+      modal.innerHTML = `
+        <div class="modal-content" style="max-width:920px;">
+          <div class="modal-header">
+            <h2 class="modal-title">Hasil Kuis: ${escapeHtml(data.quiz.title)}</h2>
+            <button type="button" class="modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
+              <div class="stat-card"><small>Jumlah Siswa</small><strong>${data.statistics.count}</strong></div>
+              <div class="stat-card"><small>Nilai Tertinggi</small><strong>${data.statistics.highest}</strong></div>
+              <div class="stat-card"><small>Nilai Terendah</small><strong>${data.statistics.lowest}</strong></div>
+              <div class="stat-card"><small>Nilai Rata-rata</small><strong>${data.statistics.average}</strong></div>
+            </div>
+            <input id="quiz-results-search" class="form-input" placeholder="Cari nama atau NIS..." style="margin-bottom:10px;" />
+            <div style="overflow-x:auto;">
+              <table class="table" style="min-width:720px;">
+                <thead><tr><th>Nama</th><th>NIS</th><th>Nilai</th><th>Benar</th><th>Salah</th><th>Waktu</th></tr></thead>
+                <tbody id="quiz-results-body">
+                  ${data.attempts.length ? data.attempts.map(attempt => `
+                    <tr data-search="${escapeHtml(`${attempt.student_name} ${attempt.student_nis}`.toLowerCase())}">
+                      <td>${escapeHtml(attempt.student_name)}</td>
+                      <td>${escapeHtml(attempt.student_nis)}</td>
+                      <td><strong>${attempt.score}</strong> / ${attempt.max_score}</td>
+                      <td>${attempt.correct_count}</td>
+                      <td>${attempt.wrong_count}</td>
+                      <td>${escapeHtml(new Date(attempt.finished_at).toLocaleString('id-ID'))}</td>
+                    </tr>
+                  `).join('') : '<tr><td colspan="6">Belum ada siswa yang mengerjakan kuis ini.</td></tr>'}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer"><button type="button" class="btn btn-outline modal-cancel">Tutup</button></div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      const close = () => modal.remove();
+      modal.querySelector('.modal-close').addEventListener('click', close);
+      modal.querySelector('.modal-cancel').addEventListener('click', close);
+      modal.querySelector('#quiz-results-search').addEventListener('input', event => {
+        const term = event.target.value.trim().toLowerCase();
+        modal.querySelectorAll('#quiz-results-body tr[data-search]').forEach(row => {
+          row.style.display = row.getAttribute('data-search').includes(term) ? '' : 'none';
+        });
+      });
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   }
 
   async openQuizModal(quiz = null) {
@@ -156,8 +223,8 @@ export class TeacherQuizzesManager {
               <div class="form-group">
                 <label class="form-label">Status</label>
                 <select class="form-select" id="quiz-status">
-                  <option value="published">Diterbitkan (Dapat diakses Siswa)</option>
-                  <option value="draft">Draf</option>
+                  <option value="published" ${quiz?.status !== 'draft' ? 'selected' : ''}>Diterbitkan (Dapat diakses Siswa)</option>
+                  <option value="draft" ${quiz?.status === 'draft' ? 'selected' : ''}>Draf</option>
                 </select>
               </div>
             </div>
@@ -165,6 +232,14 @@ export class TeacherQuizzesManager {
             <div class="form-group">
               <label class="form-label">Deskripsi / Petunjuk Pengerjaan</label>
               <textarea class="form-textarea" style="min-height: 60px;" id="quiz-desc" placeholder="Petunjuk pengerjaan bagi siswa...">${escapeHtml(quiz?.description || '')}</textarea>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;margin-bottom:10px;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Nilai Maksimum Kuis</label>
+                <input type="number" class="form-input" id="quiz-max-score" min="1" max="1000" value="${escapeHtml(String(quiz?.max_score || 100))}" />
+              </div>
+              <button type="button" class="btn btn-outline" id="quiz-auto-rubric">Bagikan Bobot Otomatis</button>
             </div>
 
             <div class="form-group">
@@ -176,6 +251,7 @@ export class TeacherQuizzesManager {
                     <span style="font-size:0.86rem; color:var(--color-text-main);">
                       <strong>[${escapeHtml(q.category)}]</strong> ${escapeHtml(q.question_text)}
                     </span>
+                    <input type="number" class="form-input quiz-q-point" data-question-id="${q.id}" min="0" max="1000" step="0.01" value="${escapeHtml(String(quiz?.rubric?.[q.id] ?? 0))}" title="Bobot soal" style="width:88px;margin-left:auto;" />
                   </label>
                 `).join('')}
               </div>
@@ -194,6 +270,24 @@ export class TeacherQuizzesManager {
     const close = () => modal.remove();
     modal.querySelector('.modal-close').addEventListener('click', close);
     modal.querySelector('.modal-cancel').addEventListener('click', close);
+    modal.querySelector('#quiz-auto-rubric').addEventListener('click', () => {
+      const checked = Array.from(modal.querySelectorAll('.quiz-q-checkbox:checked'));
+      const maxScore = Math.max(0, Number(modal.querySelector('#quiz-max-score').value) || 100);
+      const point = checked.length ? Math.round((maxScore / checked.length) * 100) / 100 : 0;
+      modal.querySelectorAll('.quiz-q-point').forEach((input, inputIndex) => {
+        const selectedIndex = checked.findIndex(cb => cb.value === input.dataset.questionId);
+        if (selectedIndex === -1) {
+          input.value = '0';
+        } else if (selectedIndex === checked.length - 1) {
+          const prior = checked.slice(0, -1).reduce((sum, cb) => {
+            return sum + Number(modal.querySelector(`.quiz-q-point[data-question-id="${CSS.escape(cb.value)}"]`)?.value || point);
+          }, 0);
+          input.value = String(Math.round((maxScore - prior) * 100) / 100);
+        } else {
+          input.value = String(point);
+        }
+      });
+    });
 
     modal.querySelector('#btn-save-quiz').addEventListener('click', async () => {
       const checkedBoxes = modal.querySelectorAll('.quiz-q-checkbox:checked');
@@ -215,7 +309,12 @@ export class TeacherQuizzesManager {
         difficulty: modal.querySelector('#quiz-difficulty').value,
         status: modal.querySelector('#quiz-status').value,
         description: modal.querySelector('#quiz-desc').value.trim(),
-        question_ids: questionIds
+        question_ids: questionIds,
+        max_score: Math.max(1, Number(modal.querySelector('#quiz-max-score').value) || 100),
+        rubric: Object.fromEntries(questionIds.map(id => [
+          id,
+          Math.max(0, Number(modal.querySelector(`.quiz-q-point[data-question-id="${CSS.escape(id)}"]`)?.value) || 0)
+        ]))
       };
 
       await this.saveQuiz(payload, quiz?.id);

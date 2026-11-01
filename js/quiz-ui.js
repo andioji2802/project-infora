@@ -6,11 +6,19 @@
 import { escapeHtml } from './utils.js';
 import { fetchPublicQuizzes, fetchQuizDetail, submitQuizAnswers } from './chat-api.js';
 
+function cryptoRandomId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export class QuizController {
   constructor(chatUiInstance) {
     this.chatUi = chatUiInstance;
     this.activeQuiz = null;
     this.userAnswers = {};
+    this.studentIdentity = null;
+    this.startedAt = null;
+    this.submissionKey = '';
   }
 
   async startQuizFlow(category = null) {
@@ -80,6 +88,11 @@ export class QuizController {
 
       this.activeQuiz = quiz;
       this.userAnswers = {};
+      const identity = await this.requestStudentIdentity(quiz);
+      if (!identity) return;
+      this.studentIdentity = identity;
+      this.startedAt = new Date().toISOString();
+      this.submissionKey = `${quiz.id}-${cryptoRandomId()}`;
 
       let questionsHtml = quiz.questions.map((q, idx) => {
         const optionsHtml = (q.options || []).map((opt, optIdx) => `
@@ -124,6 +137,60 @@ export class QuizController {
     }
   }
 
+  requestStudentIdentity(quiz) {
+    return new Promise(resolve => {
+      const modal = document.createElement('div');
+      modal.className = 'modal-backdrop';
+      modal.innerHTML = `
+        <div class="modal-content" style="max-width:520px;">
+          <div class="modal-header">
+            <h2 class="modal-title">Identitas Sebelum Mengerjakan</h2>
+          </div>
+          <div class="modal-body">
+            <p style="margin-bottom:14px;color:var(--color-text-secondary);">Isi identitas untuk menyimpan hasil kuis <strong>${escapeHtml(quiz.title)}</strong>.</p>
+            <form id="student-identity-form">
+              <div class="form-group">
+                <label class="form-label">Nama Lengkap Siswa <span class="req">*</span></label>
+                <input id="student-name" class="form-input" type="text" autocomplete="name" minlength="2" required placeholder="Masukkan nama lengkap" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">NIS (4-20 angka) <span class="req">*</span></label>
+                <input id="student-nis" class="form-input" type="text" inputmode="numeric" pattern="[0-9]{4,20}" minlength="4" maxlength="20" required placeholder="Masukkan NIS" />
+                <small id="student-identity-error" style="display:none;color:var(--color-danger,#c62828);"></small>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" id="start-student-quiz">Mulai Kuis</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      const nameInput = modal.querySelector('#student-name');
+      const nisInput = modal.querySelector('#student-nis');
+      const error = modal.querySelector('#student-identity-error');
+      modal.querySelector('#start-student-quiz').addEventListener('click', () => {
+        const studentName = nameInput.value.trim().replace(/\s+/g, ' ');
+        const studentNis = nisInput.value.trim();
+        if (studentName.length < 2) {
+          error.textContent = 'Nama lengkap wajib diisi.';
+          error.style.display = 'block';
+          nameInput.focus();
+          return;
+        }
+        if (!/^\d{4,20}$/.test(studentNis)) {
+          error.textContent = 'NIS wajib berisi 4-20 angka.';
+          error.style.display = 'block';
+          nisInput.focus();
+          return;
+        }
+        modal.remove();
+        resolve({ studentName, studentNis });
+      });
+      nameInput.focus();
+    });
+  }
+
   bindQuizInteraction(quiz) {
     // Option selection
     const cards = document.querySelectorAll(`[id^="quiz-card-"]`);
@@ -156,7 +223,12 @@ export class QuizController {
 
   async handleGradeQuiz(quiz) {
     try {
-      const result = await submitQuizAnswers(quiz.id, this.userAnswers);
+      const result = await submitQuizAnswers(
+        quiz.id,
+        this.userAnswers,
+        { ...this.studentIdentity, startedAt: this.startedAt },
+        this.submissionKey
+      );
 
       // Disable all option buttons
       document.querySelectorAll(`[id^="quiz-card-"] .quiz-option-btn`).forEach(b => {
@@ -194,10 +266,14 @@ export class QuizController {
       }
 
       // Append summary message
-      const percentage = Math.round((result.score / result.total) * 100);
+      const maxScore = Number(result.max_score) || 100;
+      const percentage = maxScore ? Math.round((Number(result.score) / maxScore) * 100) : 0;
       let summaryText = `### 📊 Hasil Latihan: ${quiz.title}\n`;
-      summaryText += `- **Skor kamu:** ${result.score} / ${result.total} (${percentage}%)\n`;
+      summaryText += `- **Nama:** ${escapeHtml(result.student_name || this.studentIdentity.studentName)}\n`;
+      summaryText += `- **NIS:** ${escapeHtml(result.student_nis || this.studentIdentity.studentNis)}\n`;
+      summaryText += `- **Nilai akhir:** ${result.score} / ${maxScore} (${percentage}%)\n`;
       summaryText += `- **Jumlah Benar:** ${result.correct_count} dari ${result.total} soal\n\n`;
+      summaryText += `- **Jumlah Salah:** ${Number(result.wrong_count ?? (result.total - result.correct_count))} dari ${result.total} soal\n\n`;
 
       if (percentage >= 80) {
         summaryText += `Luar biasa! Pemahaman kamu terhadap topik ini sudah sangat matang. Mau lanjut ke topik lainnya? 🚀`;

@@ -10,6 +10,7 @@ import { calculateCosineSimilarity, chunkMaterialContent, resolveConversationQue
 import { hashPassword, verifyPassword, MaterialItem } from '../server/db.js';
 import { buildDefinitionAnswer, classifyChatIntent, extractRelevantSections, rankMaterialsForChat, resolveChatQuery } from '../api/chat.js';
 import { validatePasswordReset } from '../js/validation.js';
+import { normalizeQuizRubric, validateStudentIdentity } from '../api/quizzes.js';
 
 test('Topic Filter allows valid SMK Informatika curriculum questions', () => {
   const q1 = evaluateTopicScope('Apa itu subnetting IP Address dan bagaimana cara menghitung host valid?');
@@ -278,6 +279,26 @@ test('Cross-material questions may produce more than one relevant ranked source'
   const ranked = rankMaterialsForChat('Bagaimana penerapan algoritma dalam konfigurasi jaringan?', materials);
   assert.ok(ranked.length >= 2);
   assert.ok(ranked.every(item => item.score > 0));
+});
+
+test('Quiz rubric supports equal distribution and per-question weights', () => {
+  const equal = normalizeQuizRubric(['q1', 'q2', 'q3'], 100, {});
+  assert.equal(equal.maxScore, 100);
+  assert.equal(Object.values(equal.rubric).reduce((sum, value) => sum + value, 0), 100);
+
+  const weighted = normalizeQuizRubric(['q1', 'q2'], 100, { q1: 70, q2: 30 });
+  assert.deepEqual(weighted.rubric, { q1: 70, q2: 30 });
+});
+
+test('Student quiz identity requires complete name and numeric NIS', () => {
+  assert.equal(validateStudentIdentity('', '123456').valid, false);
+  assert.equal(validateStudentIdentity('Siswa A', '').valid, false);
+  assert.equal(validateStudentIdentity('Siswa A', 'abc123').valid, false);
+  assert.deepEqual(validateStudentIdentity('  Siswa   A  ', '123456'), {
+    valid: true,
+    name: 'Siswa A',
+    nis: '123456'
+  });
 });
 
 test('Password hashing and PBKDF2 verification securely validates passwords', () => {
