@@ -89,7 +89,7 @@ function getMaterialSearchText(material: any): string {
 
 export function rankMaterialsForChat(message: string, materials: any[]): Array<{ material: any; score: number; keywordScore: number; semanticScore: number }> {
   const tokens = getChatTokens(message).filter(word => word.length >= 3);
-  const languageTerms = [...message.toLowerCase().matchAll(/\b(javascript|typescript|python|java|php|c\+\+|sql)\b/g)]
+  const technologyTerms = [...message.toLowerCase().matchAll(/\b(javascript|typescript|python|java|php|c\+\+|sql)\b/g)]
     .map(match => match[1]);
   return materials.map(material => {
     const text = getMaterialSearchText(material);
@@ -97,8 +97,8 @@ export function rankMaterialsForChat(message: string, materials: any[]): Array<{
       material.title, material.category, material.summary,
       material.keywords, material.aliases
     ].filter(Boolean).join(' ').toLowerCase();
-    const languageMismatch = languageTerms.some(language => !text.includes(language));
-    if (languageMismatch) return { material, score: 0, keywordScore: 0, semanticScore: 0 };
+    const technologyMismatch = technologyTerms.some(technology => !text.includes(technology));
+    if (technologyMismatch) return { material, score: 0, keywordScore: 0, semanticScore: 0 };
     let score = 0;
     let strongMatches = 0;
     let keywordScore = 0;
@@ -108,12 +108,16 @@ export function rankMaterialsForChat(message: string, materials: any[]): Array<{
     const keywordText = `${material.keywords || ''} ${material.aliases || ''}`.toLowerCase();
     const summaryText = String(material.summary || '').toLowerCase();
     const contentText = String(material.content || '').toLowerCase();
+    const exactTokenMatch = (sourceText: string, token: string) => {
+      const tokenized = ` ${String(sourceText).toLowerCase().replace(/[^a-z0-9+\-\s]/g, ' ').replace(/\s+/g, ' ').trim()} `;
+      return tokenized.includes(` ${token} `);
+    };
     for (const token of tokens) {
-      if (titleText.includes(token)) { score += 10; keywordScore += 10; strongMatches += 1; }
-      if (keywordText.includes(token)) { score += 7; keywordScore += 7; strongMatches += 1; }
-      if (summaryText.includes(token)) { score += 5; keywordScore += 5; strongMatches += 1; }
-      if (categoryText.includes(token)) { score += 4; keywordScore += 4; strongMatches += 1; }
-      if (text.includes(token)) { score += 1; keywordScore += 1; }
+      if (exactTokenMatch(titleText, token)) { score += 10; keywordScore += 10; strongMatches += 1; }
+      if (exactTokenMatch(keywordText, token)) { score += 7; keywordScore += 7; strongMatches += 1; }
+      if (exactTokenMatch(summaryText, token)) { score += 5; keywordScore += 5; strongMatches += 1; }
+      if (exactTokenMatch(categoryText, token)) { score += 4; keywordScore += 4; strongMatches += 1; }
+      if (exactTokenMatch(text, token)) { score += 1; keywordScore += 1; }
     }
     const normalizedQuery = tokens.join(' ');
     if (normalizedQuery.length > 2 && metadataText.includes(normalizedQuery)) {
@@ -126,14 +130,14 @@ export function rankMaterialsForChat(message: string, materials: any[]): Array<{
     const metadataCoverage = tokens.length === 0
       ? 0
       : tokens.filter(token =>
-          titleText.includes(token) ||
-          keywordText.includes(token) ||
-          summaryText.includes(token) ||
-          categoryText.includes(token)
+          exactTokenMatch(titleText, token) ||
+          exactTokenMatch(keywordText, token) ||
+          exactTokenMatch(summaryText, token) ||
+          exactTokenMatch(categoryText, token)
         ).length / tokens.length;
     const contentCoverage = tokens.length === 0
       ? 0
-      : tokens.filter(token => contentText.includes(token)).length / tokens.length;
+      : tokens.filter(token => exactTokenMatch(contentText, token)).length / tokens.length;
     if (contentCoverage >= 0.25) {
       score += 12;
       strongMatches += 1;
@@ -174,16 +178,24 @@ export function extractRelevantSections(material: any, message: string, limit = 
     material.learning_objectives || '',
     material.keywords || ''
   ].filter(Boolean).join('\n\n');
-  const headingPattern = /(?=^#{1,4}\s+)/m;
   const sections = source
-    .split(headingPattern)
+    .split(/(?=^#{1,4}\s+.+$)/m)
     .map((block: string) => block.replace(/^\s+|\s+$/g, ''))
     .filter(Boolean);
-  const blocks = sections.flatMap(section =>
-    section.split(/\n\s*\n/)
+  const blocks = sections.flatMap(section => {
+    const paragraphs = section.split(/\n\s*\n/)
       .map((block: string) => block.replace(/^\s+|\s+$/g, ''))
-      .filter(Boolean)
-  );
+      .filter(Boolean);
+    const contentParagraphs = paragraphs.filter(block => !/^#{1,4}\s+/.test(block));
+    if (contentParagraphs.length > 0) return [section.trim()];
+
+    const lines = section.split(/\n/).map(line => line.trim()).filter(Boolean);
+    const headingIndex = lines.findIndex(line => /^#{1,4}\s+/.test(line));
+    if (headingIndex >= 0 && lines.length > headingIndex + 1) {
+      return [`${lines[headingIndex]}\n${lines.slice(headingIndex + 1).join('\n')}`];
+    }
+    return [];
+  });
   const stopWords = new Set(['apa','yang','untuk','dengan','tentang','bagaimana','cara','jelaskan','perbedaan','dan','atau','materi','konsep','dasar','contoh','kode','itu','ini','dalam','serta','kenapa','mengapa','nih','dong','sih','gimana']);
   const normalized = message.toLowerCase();
   const tokens = [...new Set(normalized.replace(/[^a-z0-9\s+-]/g, ' ').split(/\s+/).filter(word => word.length > 2 && !stopWords.has(word)))];
@@ -193,8 +205,11 @@ export function extractRelevantSections(material: any, message: string, limit = 
     if (tokens.length > 0 && lower.includes(tokens.join(' '))) score += 20;
     tokens.forEach(token => {
       if (lower.includes(token)) score += 3;
-      if (/^#{1,4}\s/.test(block) && lower.includes(token)) score += 8;
+      if (/^#{1,4}\s/.test(block) && lower.includes(token)) score += 1;
     });
+    const lines = block.split(/\n/).map(line => line.trim()).filter(Boolean);
+    const hasBodyContent = lines.some(line => !/^#{1,4}\s+/.test(line) && line.length > 20);
+    if (!hasBodyContent) score -= 12;
     return { block, score };
   }).filter(item => item.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
 
@@ -465,7 +480,7 @@ export default async function handler(req: any, res: any) {
     }
     const topScore = relevantContexts[0].score;
     const strongestContexts = relevantContexts
-      .filter(({ score }: any) => score >= topScore * 0.58)
+      .filter(({ score }: any) => score >= topScore * 0.75)
       .slice(0, 3);
     const context = strongestContexts.map(({ material }: any, index: number) => {
       const relevantSection = extractRelevantSections(material, resolvedMessage);

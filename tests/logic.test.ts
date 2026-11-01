@@ -153,6 +153,38 @@ test('Generic retrieval ranks a newly uploaded material without topic-specific c
   assert.equal(ranked[0].material.title, 'Fotosintesis dan Reaksi Cahaya');
 });
 
+test('LAN definitions prefer explanatory paragraphs and reject unrelated coding material', () => {
+  const lan = {
+    title: 'Kabel LAN (Local Area Network)',
+    category: 'Jaringan Komputer',
+    summary: 'Kabel LAN merupakan media transmisi jaringan lokal.',
+    content: [
+      '### 1. Pengertian Kabel LAN',
+      'Kabel LAN (Local Area Network) merupakan media transmisi yang digunakan untuk menghubungkan perangkat dalam jaringan lokal.',
+      '',
+      '### 2. Fungsi Kabel LAN',
+      'Fungsi kabel LAN adalah menghubungkan komputer, switch, dan perangkat jaringan agar dapat saling bertukar data.'
+    ].join('\n')
+  };
+  const coding = {
+    title: 'Pengenalan Coding dan Dasar-Dasar Pemrograman dengan Python',
+    category: 'Pemrograman',
+    summary: 'Materi pengenalan coding dan bahasa pemrograman.',
+    content: 'Coding merupakan kegiatan menuliskan instruksi menggunakan bahasa pemrograman.'
+  };
+
+  const definition = extractRelevantSections(lan, 'Pengertian kabel LAN');
+  assert.match(definition, /Kabel LAN \(Local Area Network\)/i);
+  assert.match(definition, /media transmisi/i);
+
+  const expansion = extractRelevantSections(lan, 'Kepanjangan dari LAN');
+  assert.match(expansion, /Local Area Network/i);
+
+  const ranked = rankMaterialsForChat('Kepanjangan dari LAN', [lan, coding]);
+  assert.equal(ranked[0]?.material.title, lan.title);
+  assert.equal(ranked.some(item => item.material.title === coding.title), false);
+});
+
 test('Live coding material answers web developer and mobile developer without keyword-only fallback', () => {
   const coding = {
     id: 'coding-live',
