@@ -360,7 +360,7 @@ class TeacherApp {
         teacher_identifier: document.getElementById('profile-nip').value.trim()
       };
 
-      const res = await fetch(apiUrl('/api/auth/profile'), {
+      const res = await fetch(apiUrl('/api/auth-profile'), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
