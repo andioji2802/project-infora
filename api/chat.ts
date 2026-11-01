@@ -41,6 +41,7 @@ type ChatIntent = 'material' | 'question' | 'quiz';
 function classifyChatIntent(text: string): ChatIntent {
   const lower = text.toLowerCase();
   if (/\b(kuis|latihan kuis|mulai kuis|paket kuis|nilai kuis)\b/.test(lower)) return 'quiz';
+  if (/\b(contoh|beri|kasih)\b.*\b(soal|latihan)\b/.test(lower)) return 'material';
   if (/\b(soal|pilihan ganda|pilgan|jawaban benar|jawab soal|bank soal|kunci jawaban|pembahasan soal|nomor)\b/.test(lower)) return 'question';
   return 'material';
 }
@@ -79,18 +80,27 @@ function detectLanguages(text: string): string[] {
 
 function extractRelevantSections(material: any, message: string, limit = 1800): string {
   const source = `${material.summary || ''}\n\n${material.content || ''}`;
-  const blocks = source
-    .split(/(?:\r?\n){2,}/)
-    .flatMap((block: string) => block.split(/(?=^#{1,4}\s+)/m))
+  const headingPattern = /(?=^#{1,4}\s+)/m;
+  const sections = source
+    .split(headingPattern)
     .map((block: string) => block.replace(/^\s+|\s+$/g, ''))
     .filter(Boolean);
-  const stopWords = new Set(['apa','yang','untuk','dengan','tentang','bagaimana','cara','jelaskan','perbedaan','dan','atau','materi','konsep','dasar','contoh','kode','itu','ini','dalam','serta']);
-  const tokens = new Set(message.toLowerCase().replace(/[^a-z0-9\s+-]/g, ' ').split(/\s+/).filter(word => word.length > 2 && !stopWords.has(word)));
+  const blocks = sections.flatMap(section =>
+    section.split(/\n\s*\n/)
+      .map((block: string) => block.replace(/^\s+|\s+$/g, ''))
+      .filter(Boolean)
+  );
+  const stopWords = new Set(['apa','yang','untuk','dengan','tentang','bagaimana','cara','jelaskan','perbedaan','dan','atau','materi','konsep','dasar','contoh','kode','itu','ini','dalam','serta','kenapa','mengapa','nih','dong','sih','gimana']);
+  const normalized = message.toLowerCase();
+  const tokens = [...new Set(normalized.replace(/[^a-z0-9\s+-]/g, ' ').split(/\s+/).filter(word => word.length > 2 && !stopWords.has(word)))];
   const ranked = blocks.map(block => {
     const lower = block.toLowerCase();
     let score = 0;
-    if (tokens.size > 0 && lower.includes([...tokens].join(' '))) score += 20;
-    tokens.forEach(token => { if (lower.includes(token)) score += 1; });
+    if (tokens.length > 0 && lower.includes(tokens.join(' '))) score += 20;
+    tokens.forEach(token => {
+      if (lower.includes(token)) score += 3;
+      if (/^#{1,4}\s/.test(block) && lower.includes(token)) score += 8;
+    });
     return { block, score };
   }).filter(item => item.score > 0).sort((a, b) => b.score - a.score);
 
@@ -264,8 +274,12 @@ export default async function handler(req: any, res: any) {
     const stopWords = new Set(['apa','yang','untuk','dengan','tentang','bagaimana','cara','jelaskan','perbedaan','dan','atau','materi','konsep','dasar','contoh','kode','itu','ini']);
     const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
     const lastUserQuestion = [...history].reverse().find((item: any) => item?.role === 'user' && typeof item.content === 'string')?.content;
-    const isFollowUp = /\b(itu|tersebut|lanjut|lanjutkan|contohnya|jelaskan lagi|berapa|rumusnya)\b/i.test(message)
-      || /^bagaimana contoh/i.test(message);
+    const continuationPattern = /\b(itu|tersebut|lanjut|lanjutkan|contohnya|jelaskan lagi|berapa|rumusnya|rang(e|enya)|fungsi nya|fungsinya|bentuknya)\b/i;
+    const shortCasualPattern = /^((apa|apaan|kenapa|gimana|gmn|contohin|jelasin|terusin|lanjutkan|range)\b[\s\S]*)$/i;
+    const previousDistinctTopic = lastUserQuestion && !/loop|perulangan|algoritma/i.test(message) && /loop|perulangan/i.test(lastUserQuestion);
+    const isFollowUp = continuationPattern.test(message)
+      || (shortCasualPattern.test(message) && message.split(/\s+/).length <= 7)
+      || (/^range\b/i.test(message) && !!previousDistinctTopic);
     const resolvedMessage = isFollowUp && lastUserQuestion
       ? `${lastUserQuestion}\n${message}`
       : message || '';
@@ -329,11 +343,12 @@ export default async function handler(req: any, res: any) {
         sources: []
       });
     }
-    const context = relevantContexts.map(({ material }: any, index: number) => {
+    const strongestContexts = relevantContexts.slice(0, 1);
+    const context = strongestContexts.map(({ material }: any, index: number) => {
       const relevantSection = extractRelevantSections(material, resolvedMessage);
       return `SUMBER ${index + 1}: ${material.title}\nKategori: ${material.category}\nRingkasan: ${material.summary || ''}\nKUTIPAN RELEVAN:\n${relevantSection}`;
     }).join('\n\n');
-    const sources = relevantContexts.map(({ material }: any) => ({
+    const sources = strongestContexts.map(({ material }: any) => ({
       title: material.title,
       category: material.category,
       teacher_name: material.teacher_name || 'Guru Informatika',

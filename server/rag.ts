@@ -57,8 +57,9 @@ export function resolveConversationQuery(userMessage: string, history: ChatHisto
 
   if (recentUserQuestions.length === 0) return latest;
 
-  const followupPattern = /\b(itu|tersebut|lanjutkan|lanjut|contohnya|jelaskan lagi|berapa|rumusnya)\b/i;
-  if (followupPattern.test(latest)) {
+  const followupPattern = /\b(itu|tersebut|lanjutkan|lanjut|contohnya|jelaskan lagi|berapa|rumusnya|range|rangnya|fungsinya)\b/i;
+  const casualShortPattern = /^(apa|apaan|kenapa|gimana|gmn|jelasin|contohin)\b/i;
+  if (followupPattern.test(latest) || (casualShortPattern.test(latest) && latest.split(/\s+/).length <= 7)) {
     return `${recentUserQuestions.join(' ')} ${latest}`;
   }
 

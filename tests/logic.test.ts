@@ -58,6 +58,17 @@ test('Conversation follow-ups retain context from recent student questions', () 
   assert.match(resolved, /host validnya/i);
 });
 
+test('Casual looping follow-ups retain the looping topic', () => {
+  const history = [
+    { role: 'user' as const, content: 'Apa bedanya for dan while?' },
+    { role: 'assistant' as const, content: 'for dan while digunakan untuk perulangan.' }
+  ];
+
+  const resolved = resolveConversationQuery('Range itu apa?', history);
+  assert.match(resolved, /for|while|looping|perulangan/i);
+  assert.match(resolved, /range/i);
+});
+
 test('Contextual follow-ups use the matched material and student question', () => {
   const material: MaterialItem = {
     id: 'test-algorithm',
