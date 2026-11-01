@@ -37,12 +37,15 @@
         <!-- Form Login -->
         <form id="form-login" style="display: flex; flex-direction: column; gap: 14px;">
           <div class="form-group">
-            <label for="login-email" class="form-label">Email Guru <span class="req">*</span></label>
-            <input type="email" id="login-email" class="form-input" placeholder="guru@smk.belajar.id" required autocomplete="username" />
+            <label for="login-nip" class="form-label">NIP / ID Guru <span class="req">*</span></label>
+            <input type="text" id="login-nip" class="form-input" placeholder="Masukkan NIP atau ID guru" required autocomplete="username" />
           </div>
           <div class="form-group">
             <label for="login-password" class="form-label">Kata Sandi <span class="req">*</span></label>
-            <input type="password" id="login-password" class="form-input" placeholder="••••••••" required autocomplete="current-password" />
+            <div style="position:relative;">
+              <input type="password" id="login-password" class="form-input" placeholder="••••••••" required autocomplete="current-password" style="padding-right:44px;" />
+              <button type="button" class="password-toggle" data-target="login-password" aria-label="Tampilkan kata sandi" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:transparent;cursor:pointer;">Lihat</button>
+            </div>
           </div>
           <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 6px;">
             Masuk Portal Guru
@@ -66,16 +69,29 @@
             </div>
             <div class="form-group">
               <label for="reg-nip" class="form-label">NIP / ID Guru</label>
-              <input type="text" id="reg-nip" class="form-input" placeholder="19850101..." />
+              <input type="text" id="reg-nip" class="form-input" placeholder="19850101..." required />
             </div>
           </div>
           <div class="form-group">
             <label for="reg-password" class="form-label">Kata Sandi <span class="req">*</span></label>
-            <input type="password" id="reg-password" class="form-input" placeholder="Minimal 6 karakter" required autocomplete="new-password" />
+            <div style="position:relative;">
+              <input type="password" id="reg-password" class="form-input" placeholder="Minimal 8 karakter" required autocomplete="new-password" style="padding-right:44px;" />
+              <button type="button" class="password-toggle" data-target="reg-password" aria-label="Tampilkan kata sandi" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:transparent;cursor:pointer;">Lihat</button>
+            </div>
+            <div id="password-checklist" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;font-size:0.78rem;">
+              <span data-password-rule="length">○ Minimal 8 karakter</span>
+              <span data-password-rule="upper">○ Ada huruf besar</span>
+              <span data-password-rule="lower">○ Ada huruf kecil</span>
+              <span data-password-rule="number">○ Ada angka</span>
+              <span data-password-rule="symbol">○ Ada simbol</span>
+            </div>
           </div>
           <div class="form-group">
             <label for="reg-confirm-password" class="form-label">Konfirmasi Kata Sandi <span class="req">*</span></label>
-            <input type="password" id="reg-confirm-password" class="form-input" placeholder="Ulangi kata sandi" required autocomplete="new-password" />
+            <div style="position:relative;">
+              <input type="password" id="reg-confirm-password" class="form-input" placeholder="Ulangi kata sandi" required autocomplete="new-password" style="padding-right:44px;" />
+              <button type="button" class="password-toggle" data-target="reg-confirm-password" aria-label="Tampilkan kata sandi" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:transparent;cursor:pointer;">Lihat</button>
+            </div>
           </div>
           <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 6px;">
             Daftar Akun Guru

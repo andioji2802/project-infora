@@ -58,6 +58,38 @@ class TeacherApp {
     const formLogin = document.getElementById('form-login');
     const formRegister = document.getElementById('form-register');
 
+    document.querySelectorAll('.password-toggle').forEach(button => {
+      button.addEventListener('click', () => {
+        const input = document.getElementById(button.dataset.target);
+        if (!input) return;
+        const visible = input.type === 'text';
+        input.type = visible ? 'password' : 'text';
+        button.textContent = visible ? 'Lihat' : 'Sembunyikan';
+        button.setAttribute('aria-label', visible ? 'Tampilkan kata sandi' : 'Sembunyikan kata sandi');
+      });
+    });
+
+    const passwordInput = document.getElementById('reg-password');
+    if (passwordInput) {
+      passwordInput.addEventListener('input', () => {
+        const value = passwordInput.value;
+        const rules = {
+          length: value.length >= 8,
+          upper: /[A-Z]/.test(value),
+          lower: /[a-z]/.test(value),
+          number: /[0-9]/.test(value),
+          symbol: /[^A-Za-z0-9]/.test(value)
+        };
+        Object.entries(rules).forEach(([rule, valid]) => {
+          const element = document.querySelector(`[data-password-rule="${rule}"]`);
+          if (element) {
+            element.textContent = `${valid ? '✓' : '○'} ${element.textContent.replace(/^[✓○]\s*/, '')}`;
+            element.style.color = valid ? '#16a34a' : '#64748b';
+          }
+        });
+      });
+    }
+
     if (tabLogin && tabRegister) {
       tabLogin.addEventListener('click', () => {
         tabLogin.classList.add('active');
@@ -77,10 +109,10 @@ class TeacherApp {
     if (formLogin) {
       formLogin.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const email = document.getElementById('login-email').value;
+        const nip = document.getElementById('login-nip').value;
         const password = document.getElementById('login-password').value;
 
-        const val = validateTeacherLogin({ email, password });
+        const val = validateTeacherLogin({ nip, password });
         if (!val.isValid) {
           showToast(Object.values(val.errors)[0], 'error');
           return;
@@ -91,7 +123,7 @@ class TeacherApp {
         submitBtn.textContent = 'Memverifikasi...';
 
         try {
-          this.user = await loginTeacher(email, password);
+          this.user = await loginTeacher(nip, password);
           showToast(`Selamat datang kembali, ${this.user.full_name}!`, 'success');
           this.showDashboard();
         } catch (err) {

@@ -175,6 +175,13 @@ class InforaDatabase {
     return this.data.profiles.find(p => p.email.toLowerCase() === email.toLowerCase());
   }
 
+  getProfileByNip(nip: string): TeacherProfile | undefined {
+    const normalized = String(nip || '').trim().toLowerCase();
+    return this.data.profiles.find(p =>
+      String(p.teacher_identifier || '').trim().toLowerCase() === normalized
+    );
+  }
+
   getProfileById(id: string): TeacherProfile | undefined {
     return this.data.profiles.find(p => p.id === id);
   }

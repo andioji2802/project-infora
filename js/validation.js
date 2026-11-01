@@ -29,8 +29,21 @@ export function validateTeacherRegistration(data) {
     errors.email = 'Format email tidak valid.';
   }
 
-  if (!data.password || data.password.length < 6) {
-    errors.password = 'Kata sandi minimal 6 karakter.';
+  if (!data.teacherIdentifier || !data.teacherIdentifier.trim()) {
+    errors.teacherIdentifier = 'NIP / ID Guru wajib diisi.';
+  }
+
+  const password = data.password || '';
+  if (password.length < 8) {
+    errors.password = 'Kata sandi minimal 8 karakter.';
+  } else if (!/[A-Z]/.test(password)) {
+    errors.password = 'Kata sandi harus memiliki huruf besar.';
+  } else if (!/[a-z]/.test(password)) {
+    errors.password = 'Kata sandi harus memiliki huruf kecil.';
+  } else if (!/[0-9]/.test(password)) {
+    errors.password = 'Kata sandi harus memiliki angka.';
+  } else if (!/[^A-Za-z0-9]/.test(password)) {
+    errors.password = 'Kata sandi harus memiliki simbol.';
   }
 
   if (data.password !== data.confirmPassword) {
@@ -45,8 +58,8 @@ export function validateTeacherRegistration(data) {
 
 export function validateTeacherLogin(data) {
   const errors = {};
-  if (!data.email || !data.email.trim()) {
-    errors.email = 'Email wajib diisi.';
+  if (!data.nip || !data.nip.trim()) {
+    errors.nip = 'NIP / ID Guru wajib diisi.';
   }
   if (!data.password) {
     errors.password = 'Kata sandi wajib diisi.';
