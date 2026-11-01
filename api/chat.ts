@@ -27,7 +27,9 @@ export default async function handler(req: any, res: any) {
 
     const ai = new GoogleGenAI({ apiKey });
     const result = await ai.models.generateContent({
-      model: process.env.GEMINI_MODEL_NAME?.trim() || 'gemini-3.8-flash',
+      model: (process.env.GEMINI_MODEL_NAME?.trim() === 'gemini-2.5-flash'
+        ? 'gemini-3.8-flash'
+        : process.env.GEMINI_MODEL_NAME?.trim()) || 'gemini-3.8-flash',
       contents: message,
       config: {
         systemInstruction: 'Jawab sebagai tutor Informatika untuk siswa SMK. Gunakan bahasa Indonesia yang jelas, ringkas, dan edukatif.',

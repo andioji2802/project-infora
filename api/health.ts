@@ -7,6 +7,8 @@ export default function handler(req: any, res: any) {
       process.env.GEMINI_API_KEY?.trim() ||
       process.env.GEMINI_API_INFORA?.trim()
     ),
-    model: process.env.GEMINI_MODEL_NAME?.trim() || 'gemini-3.8-flash'
+    model: process.env.GEMINI_MODEL_NAME?.trim() === 'gemini-2.5-flash'
+      ? 'gemini-3.8-flash'
+      : process.env.GEMINI_MODEL_NAME?.trim() || 'gemini-3.8-flash'
   });
 }
