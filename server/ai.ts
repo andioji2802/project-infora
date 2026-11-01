@@ -21,9 +21,7 @@ export const ai = apiKey
   : null;
 
 export const GENERATIVE_MODEL_NAME =
-  process.env.GEMINI_MODEL_NAME?.trim() === 'gemini-2.5-flash'
-    ? 'gemini-3.8-flash'
-    : process.env.GEMINI_MODEL_NAME?.trim() || 'gemini-3.8-flash';
+  process.env.GEMINI_MODEL_NAME?.trim() || 'gemini-2.5-flash';
 export const EMBEDDING_MODEL_NAME = 'gemini-embedding-2-preview';
 
 function withTimeout<T>(promise: Promise<T>, ms = 30000): Promise<T> {

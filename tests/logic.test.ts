@@ -178,6 +178,17 @@ test('Live-style Supabase summary-only definitions remain retrievable', () => {
   assert.match(buildDefinitionAnswer('subnetting itu apa', subnetting) || '', /Subnetting adalah/i);
 });
 
+test('Ranking rejects unrelated material and mismatched programming languages', () => {
+  const materials = [
+    { title: 'Looping Python', category: 'Pemrograman', keywords: 'python for while range', summary: 'Perulangan pada Python.', content: '### Perulangan for\nfor i in range(5): print(i)' },
+    { title: 'Basis Data', category: 'Basis Data', keywords: 'primary key foreign key sql', summary: 'Relasi tabel menggunakan primary key dan foreign key.', content: 'Primary key adalah kunci utama tabel.' }
+  ];
+
+  assert.equal(rankMaterialsForChat('Jelaskan konsep Primary Key dan Foreign Key pada basis data relasional', materials)[0]?.material.title, 'Basis Data');
+  assert.equal(rankMaterialsForChat('Bagaimana cara membuat perulangan for dan while dalam JavaScript?', materials)[0]?.material.title, undefined);
+  assert.equal(rankMaterialsForChat('Bagaimana cara mendapatkan pacar di sekolah?', materials).length, 0);
+});
+
 test('Password hashing and PBKDF2 verification securely validates passwords', () => {
   const password = 'GuruInformatika2026!';
   const { hash, salt } = hashPassword(password);

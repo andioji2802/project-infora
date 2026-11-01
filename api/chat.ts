@@ -1,6 +1,7 @@
 import { db } from '../server/db.js';
 import { parseRequestBody } from '../server/http.js';
 import { getSupabaseConfig, supabaseRequest } from '../server/supabase.js';
+import { evaluateTopicScope, EXACT_REFUSAL_MESSAGE } from '../server/topicFilter.js';
 
 function normalizeQuery(text: string): string {
   return text.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -55,8 +56,15 @@ function getMaterialSearchText(material: any): string {
 
 export function rankMaterialsForChat(message: string, materials: any[]): Array<{ material: any; score: number }> {
   const tokens = getChatTokens(message);
+  const languageTerms = [...message.toLowerCase().matchAll(/\b(javascript|typescript|python|java|php|c\+\+|sql)\b/g)]
+    .map(match => match[1]);
   return materials.map(material => {
     const text = getMaterialSearchText(material);
+    const languageMismatch = languageTerms.some(language =>
+      !text.includes(language) &&
+      !getMaterialSearchText({ title: material.title, category: material.category, summary: material.summary, keywords: material.keywords }).includes(language)
+    );
+    if (languageMismatch) return { material, score: 0 };
     let score = 0;
     for (const token of tokens) {
       if (String(material.title || '').toLowerCase().includes(token)) score += 8;
@@ -66,7 +74,7 @@ export function rankMaterialsForChat(message: string, materials: any[]): Array<{
       if (String(material.content || '').toLowerCase().includes(token)) score += 1;
     }
     return { material, score };
-  }).filter(item => item.score > 0).sort((a, b) => b.score - a.score);
+  }).filter(item => item.score >= 4).sort((a, b) => b.score - a.score);
 }
 
 export function resolveChatQuery(message: string, history: Array<{ role: string; content: string }> = [], materials: any[] = []): string {
@@ -183,6 +191,14 @@ export default async function handler(req: any, res: any) {
     const body = parseRequestBody(req);
     const message = typeof body.message === 'string' ? body.message.trim() : '';
     if (!message) return res.status(400).json({ error: 'Pesan pertanyaan tidak boleh kosong.' });
+    const scope = evaluateTopicScope(message);
+    if (!scope.allowed) {
+      return res.status(200).json({
+        answer: EXACT_REFUSAL_MESSAGE,
+        isRefusal: true,
+        sources: []
+      });
+    }
 
     let materials: any[] = db.getMaterials('published');
     if (getSupabaseConfig()) {
@@ -365,7 +381,7 @@ export default async function handler(req: any, res: any) {
       .map((item: any) => `${item?.role === 'user' ? 'SISWA' : 'INFORA'}: ${String(item?.content || '')}`)
       .join('\n');
     const configured = process.env.GEMINI_MODEL_NAME?.trim();
-    const model = !configured || configured === 'gemini-2.5-flash' ? 'gemini-3.8-flash' : configured;
+    const model = configured?.trim() || 'gemini-2.5-flash';
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
       {
@@ -409,27 +425,6 @@ export default async function handler(req: any, res: any) {
     });
   } catch (error: any) {
     console.error('Chat error:', error);
-    const materials = db.getMaterials('published');
-    const fallbackBody = parseRequestBody(req);
-    const words = String(typeof fallbackBody.message === 'string' ? fallbackBody.message : '').toLowerCase().split(/\s+/).filter(Boolean);
-    const match = materials.find(material =>
-      words.some(word => word.length > 3 && `${material.title} ${material.summary || ''} ${material.keywords || ''} ${material.content}`.toLowerCase().includes(word))
-    );
-    if (match) {
-      const fallbackSection = buildSpecificFallback(String(fallbackBody.message || ''), match);
-      if (!fallbackSection) {
-        return res.status(200).json({
-          answer: 'Guru belum memberikan materi untuk pertanyaan ini.',
-          isRefusal: true,
-          sources: []
-        });
-      }
-      return res.status(200).json({
-        answer: fallbackSection,
-        isRefusal: false,
-        sources: [{ title: match.title, category: match.category, teacher_name: match.teacher_name || 'Guru Informatika', summary: match.summary }]
-      });
-    }
     return res.status(200).json({
       answer: 'Guru belum memberikan materi untuk pertanyaan ini.',
       isRefusal: true,
