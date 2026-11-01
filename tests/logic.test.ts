@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { evaluateTopicScope, EXACT_REFUSAL_MESSAGE } from '../server/topicFilter.js';
 import { calculateCosineSimilarity, chunkMaterialContent, resolveConversationQuery, buildContextualFollowups } from '../server/rag.js';
 import { hashPassword, verifyPassword, MaterialItem } from '../server/db.js';
-import { classifyChatIntent, rankMaterialsForChat, resolveChatQuery } from '../api/chat.js';
+import { buildDefinitionAnswer, classifyChatIntent, extractRelevantSections, rankMaterialsForChat, resolveChatQuery } from '../api/chat.js';
 
 test('Topic Filter allows valid SMK Informatika curriculum questions', () => {
   const q1 = evaluateTopicScope('Apa itu subnetting IP Address dan bagaimana cara menghitung host valid?');
@@ -163,6 +163,19 @@ test('Chat intent separates generated examples from bank quiz requests', () => {
   assert.equal(classifyChatIntent('Berikan contoh soal tentang materi baru'), 'material');
   assert.equal(classifyChatIntent('Mulai kuis tentang fotosintesis'), 'quiz');
   assert.equal(classifyChatIntent('Jawaban soal nomor 2 beserta pembahasannya'), 'question');
+});
+
+test('Live-style Supabase summary-only definitions remain retrievable', () => {
+  const subnetting = {
+    title: 'Jaringan Komputer: Subnetting IP Address dan Notasi CIDR',
+    category: 'Jaringan Komputer',
+    summary: 'Subnetting adalah teknik memecah satu jaringan besar menjadi sub-jaringan yang lebih kecil dan efisien untuk mengoptimalkan alokasi IP Address.',
+    content: 'IPv4 terdiri dari 32 bit yang dibagi menjadi 4 oktet. Notasi CIDR menunjukkan bit network. Contoh /24 memiliki 254 host valid, sedangkan /26 memiliki 62 host valid.'
+  };
+
+  assert.ok(extractRelevantSections(subnetting, 'apa itu subnetting').length > 0);
+  assert.match(buildDefinitionAnswer('apa itu subnetting', subnetting) || '', /Subnetting adalah/i);
+  assert.match(buildDefinitionAnswer('subnetting itu apa', subnetting) || '', /Subnetting adalah/i);
 });
 
 test('Password hashing and PBKDF2 verification securely validates passwords', () => {

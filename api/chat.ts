@@ -89,12 +89,15 @@ export function resolveChatQuery(message: string, history: Array<{ role: string;
   return `${recentUsers[recentUsers.length - 1]} ${latest}`;
 }
 
-function extractRelevantSections(material: any, message: string, limit = 1800): string {
+export function extractRelevantSections(material: any, message: string, limit = 1800): string {
   const source = [
+    material.summary || '',
     material.content || '',
     material.examples || '',
     material.practice_steps || '',
-    material.faq || ''
+    material.faq || '',
+    material.learning_objectives || '',
+    material.keywords || ''
   ].filter(Boolean).join('\n\n');
   const headingPattern = /(?=^#{1,4}\s+)/m;
   const sections = source
@@ -138,16 +141,20 @@ function buildSpecificFallback(message: string, material: any): string {
   return `Berdasarkan materi guru:\n\n${relevant}`;
 }
 
-function buildDefinitionAnswer(message: string, material: any): string | null {
+export function buildDefinitionAnswer(message: string, material: any): string | null {
   const normalized = message.toLowerCase();
   const source = [
     material.summary || '',
     material.content || '',
     material.faq || ''
   ].filter(Boolean).join('\n\n');
-  const definitionMatch = normalized.match(/\bapa itu\s+([a-z][a-z0-9 +_-]{2,40})\??$/i);
+  const definitionMatch =
+    normalized.match(/\bapa itu\s+([a-z][a-z0-9 +_\/-]{2,40})\??$/i) ||
+    normalized.match(/\b(?:apa|apa sih)\s+(?:yang dimaksud dengan\s+)?([a-z][a-z0-9 +_\/-]{2,40})\??$/i) ||
+    normalized.match(/\b([a-z][a-z0-9 +_\/-]{2,40})\s+(?:itu|artinya)\s+apa\??$/i) ||
+    normalized.match(/^(?:lalu\s+)?apa arti(?:nya)?\s+([a-z][a-z0-9 +_\/-]{2,40})\??$/i);
   if (definitionMatch) {
-    const concept = definitionMatch[1]
+    const concept = (definitionMatch[1] || definitionMatch[0])
       .replace(/\s+(bro|sih|dong|nih|ya|tolong)$/i, '')
       .trim();
     const paragraph = source.split(/\n\s*\n/)
