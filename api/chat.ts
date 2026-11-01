@@ -36,6 +36,47 @@ function normalizeQuery(text: string): string {
   return normalized.replace(/\s+/g, ' ').trim();
 }
 
+const LANGUAGE_RULES: Array<{ name: string; signals: string[] }> = [
+  { name: 'javascript', signals: ['javascript', 'js', 'node.js', 'nodejs'] },
+  { name: 'python', signals: ['python', 'py'] },
+  { name: 'java', signals: ['java'] },
+  { name: 'c++', signals: ['c++'] },
+  { name: 'php', signals: ['php'] }
+];
+
+function detectLanguages(text: string): string[] {
+  const lower = text.toLowerCase();
+  return LANGUAGE_RULES
+    .filter(rule => rule.signals.some(signal => {
+      if (signal === 'js') return new RegExp('(^|[^a-z])js([^a-z]|$)', 'i').test(lower);
+      return lower.includes(signal);
+    }))
+    .map(rule => rule.name);
+}
+
+function extractRelevantSections(material: any, message: string, limit = 1800): string {
+  const source = `${material.summary || ''}\n\n${material.content || ''}`;
+  const blocks = source
+    .split(/(?=^#{1,4}\s+)/m)
+    .flatMap((block: string) => block.split(/\n(?=[A-Z][A-Za-z0-9 -]{2,50}:?\n)/).map((part: string) => part.trim()))
+    .filter(Boolean);
+  const stopWords = new Set(['apa','yang','untuk','dengan','tentang','bagaimana','cara','jelaskan','perbedaan','dan','atau','materi','konsep','dasar','contoh','kode','itu','ini','dalam','serta']);
+  const tokens = new Set(message.toLowerCase().replace(/[^a-z0-9\s+-]/g, ' ').split(/\s+/).filter(word => word.length > 2 && !stopWords.has(word)));
+  const ranked = blocks.map(block => {
+    const lower = block.toLowerCase();
+    let score = 0;
+    tokens.forEach(token => { if (lower.includes(token)) score += 1; });
+    return { block, score };
+  }).filter(item => item.score > 0).sort((a, b) => b.score - a.score);
+
+  let output = '';
+  for (const item of ranked) {
+    if (output.length + item.block.length > limit) break;
+    output += `${output ? '\n\n' : ''}${item.block}`;
+  }
+  return output.slice(0, limit).trim();
+}
+
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', req.headers?.origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -95,10 +136,35 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const context = scored.map(({ material }, index) =>
-      `SUMBER ${index + 1}: ${material.title}\nKategori: ${material.category}\nRingkasan: ${material.summary || ''}\nIsi: ${material.content.slice(0, 3500)}`
-    ).join('\n\n');
-    const sources = scored.map(({ material }) => ({
+    const queryLanguages = detectLanguages(normalizedMessage);
+    const languageMismatch = scored.find(({ material }: any) => {
+      const sourceText = `${material.title || ''} ${material.summary || ''} ${material.content || ''}`;
+      const sourceLanguages = detectLanguages(sourceText);
+      return queryLanguages.length > 0 &&
+        sourceLanguages.length > 0 &&
+        !queryLanguages.some(language => sourceLanguages.includes(language));
+    });
+    if (queryLanguages.length > 0 && languageMismatch) {
+      return res.status(200).json({
+        answer: 'Guru belum memberikan materi yang membahas bahasa atau teknologi tersebut secara spesifik. Silakan gunakan pertanyaan yang sesuai dengan materi yang sudah diunggah guru.',
+        isRefusal: true,
+        sources: []
+      });
+    }
+
+    const relevantContexts = scored.filter(({ material }: any) => extractRelevantSections(material, resolvedMessage).length > 0);
+    if (relevantContexts.length === 0) {
+      return res.status(200).json({
+        answer: 'Guru belum memberikan materi untuk pertanyaan ini.',
+        isRefusal: true,
+        sources: []
+      });
+    }
+    const context = relevantContexts.map(({ material }: any, index: number) => {
+      const relevantSection = extractRelevantSections(material, resolvedMessage);
+      return `SUMBER ${index + 1}: ${material.title}\nKategori: ${material.category}\nRingkasan: ${material.summary || ''}\nKUTIPAN RELEVAN:\n${relevantSection}`;
+    }).join('\n\n');
+    const sources = relevantContexts.map(({ material }: any) => ({
       title: material.title,
       category: material.category,
       teacher_name: material.teacher_name || 'Guru Informatika',
@@ -107,8 +173,9 @@ export default async function handler(req: any, res: any) {
 
     const apiKey = process.env.GEMINI_API_KEY?.trim() || process.env.GEMINI_API_INFORA?.trim();
     if (!apiKey) {
+      const fallbackSection = extractRelevantSections(relevantContexts[0].material, resolvedMessage, 900);
       return res.status(200).json({
-        answer: `${scored[0].material.summary ? scored[0].material.summary + '\n\n' : ''}${scored[0].material.content.slice(0, 1800)}`,
+        answer: fallbackSection,
         isRefusal: false,
         sources
       });
@@ -126,10 +193,10 @@ export default async function handler(req: any, res: any) {
         signal: AbortSignal.timeout(5000),
         body: JSON.stringify({
           system_instruction: {
-            parts: [{ text: 'Kamu adalah tutor Informatika SMK. Jawab HANYA dari sumber materi di bawah. Jika detail tidak ada di sumber, katakan bahwa materi guru belum mencakupnya. Jangan gunakan pengetahuan internet atau umum. Jawab ringkas dalam bahasa Indonesia.' }]
+            parts: [{ text: 'Kamu adalah tutor Informatika SMK. Jawab HANYA dari kutipan relevan yang diberikan. Jangan menampilkan seluruh materi. Susun jawaban yang hanya menjawab pertanyaan terakhir secara spesifik dan ringkas. Jika bahasa, platform, atau detail yang ditanyakan tidak ada pada kutipan, katakan materi guru belum mencakupnya. Jangan memakai pengetahuan internet atau umum. Sertakan contoh kode hanya jika kode atau bahasa tersebut benar-benar ada pada sumber.' }]
           },
           contents: [{ role: 'user', parts: [{ text: `${conversationSnippet ? `RIWAYAT PERCAKAPAN:\n${conversationSnippet}\n\n` : ''}PERTANYAAN SISWA TERAKHIR:\n${message}\n\nSUMBER MATERI GURU:\n${context}\n\nJawab hanya pertanyaan terakhir siswa dan gunakan materi sumber di atas.` }] }],
-          generationConfig: { temperature: 0.25, maxOutputTokens: 2048 }
+          generationConfig: { temperature: 0.15, maxOutputTokens: 768 }
         })
       }
     );
@@ -138,15 +205,17 @@ export default async function handler(req: any, res: any) {
     try {
       payload = JSON.parse(responseText);
     } catch {
+      const fallbackSection = extractRelevantSections(relevantContexts[0].material, resolvedMessage, 900);
       return res.status(200).json({
-        answer: `${scored[0].material.summary ? scored[0].material.summary + '\n\n' : ''}${scored[0].material.content.slice(0, 1800)}`,
+        answer: fallbackSection,
         isRefusal: false,
         sources
       });
     }
     if (!response.ok) {
+      const fallbackSection = extractRelevantSections(relevantContexts[0].material, resolvedMessage, 900);
       return res.status(200).json({
-        answer: `${scored[0].material.summary ? scored[0].material.summary + '\n\n' : ''}${scored[0].material.content.slice(0, 1800)}`,
+        answer: fallbackSection,
         isRefusal: false,
         sources
       });
@@ -162,8 +231,16 @@ export default async function handler(req: any, res: any) {
       words.some(word => word.length > 3 && `${material.title} ${material.summary || ''} ${material.keywords || ''} ${material.content}`.toLowerCase().includes(word))
     );
     if (match) {
+      const fallbackSection = extractRelevantSections(match, String(fallbackBody.message || ''), 900);
+      if (!fallbackSection) {
+        return res.status(200).json({
+          answer: 'Guru belum memberikan materi untuk pertanyaan ini.',
+          isRefusal: true,
+          sources: []
+        });
+      }
       return res.status(200).json({
-        answer: `${match.summary ? match.summary + '\n\n' : ''}${match.content.slice(0, 1800)}`,
+        answer: fallbackSection,
         isRefusal: false,
         sources: [{ title: match.title, category: match.category, teacher_name: match.teacher_name || 'Guru Informatika', summary: match.summary }]
       });
