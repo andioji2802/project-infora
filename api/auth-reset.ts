@@ -29,6 +29,10 @@ export default async function handler(req: any, res: any) {
   if (!config) {
     const profile = isEmail ? db.getProfileByEmail(identifier) : db.getProfileByNip(identifier);
     if (!profile) return res.status(404).json({ error: 'Akun guru tidak ditemukan.' });
+    if (body.checkOnly) {
+      const samePassword = verifyPassword(newPassword, profile.password_hash, profile.password_salt);
+      return res.status(200).json({ samePassword });
+    }
     if (verifyPassword(newPassword, profile.password_hash, profile.password_salt)) {
       return res.status(400).json({ code: 'SAME_PASSWORD', error: 'Kata sandi baru tidak boleh sama dengan kata sandi lama.' });
     }
@@ -49,6 +53,10 @@ export default async function handler(req: any, res: any) {
     return res.status(404).json({ error: 'Akun guru tidak ditemukan.' });
   }
   const profile = result.data[0];
+  if (body.checkOnly) {
+    const samePassword = verifyPassword(newPassword, profile.password_hash, profile.password_salt);
+    return res.status(200).json({ samePassword });
+  }
   if (verifyPassword(newPassword, profile.password_hash, profile.password_salt)) {
     return res.status(400).json({ code: 'SAME_PASSWORD', error: 'Kata sandi baru tidak boleh sama dengan kata sandi lama.' });
   }

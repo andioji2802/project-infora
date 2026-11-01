@@ -50,7 +50,7 @@ class TeacherApp {
     if (registerTab) registerTab.classList.remove('active');
   }
 
-  openPasswordResetModal(identifier) {
+  openPasswordResetModal(identifier = '') {
     const existing = document.getElementById('password-reset-modal');
     if (existing) existing.remove();
 
@@ -66,6 +66,10 @@ class TeacherApp {
         <div class="modal-body">
           <form id="password-reset-form">
             <div class="form-group">
+              <label class="form-label" for="reset-identifier">Email atau NIP / ID Guru</label>
+              <input type="text" id="reset-identifier" class="form-input" value="${escapeHtml(identifier)}" placeholder="Masukkan email atau NIP / ID guru" autocomplete="username" required />
+            </div>
+            <div class="form-group">
               <label class="form-label" for="reset-new-password">Kata sandi baru</label>
               <div style="position:relative;">
                 <input type="password" id="reset-new-password" class="form-input" autocomplete="new-password" required style="padding-right:44px;" />
@@ -79,6 +83,7 @@ class TeacherApp {
               <span data-reset-rule="number">○ Ada angka</span>
               <span data-reset-rule="symbol">○ Ada simbol</span>
             </div>
+            <p id="reset-same-password-message" style="display:none;color:var(--color-danger);font-size:0.82rem;margin:10px 0 0;">Kata sandi baru tidak boleh sama dengan kata sandi lama.</p>
             <button type="submit" id="password-reset-submit" class="btn btn-primary" style="width:100%;margin-top:16px;" disabled>Selesai</button>
           </form>
         </div>
@@ -92,9 +97,47 @@ class TeacherApp {
       if (event.target === modal) close();
     });
 
+    const identifierInput = document.getElementById('reset-identifier');
     const input = document.getElementById('reset-new-password');
     const submit = document.getElementById('password-reset-submit');
     const toggle = document.getElementById('reset-password-toggle');
+    const samePasswordMessage = document.getElementById('reset-same-password-message');
+    let resetCheckTimer = 0;
+
+    const checkSamePassword = async () => {
+      const resetIdentifier = identifierInput.value.trim();
+      const validation = validatePasswordReset(input.value);
+      samePasswordMessage.style.display = 'none';
+      submit.disabled = !resetIdentifier || !validation.isValid;
+      if (!resetIdentifier || !validation.isValid) return;
+
+      submit.disabled = true;
+      submit.textContent = 'Memeriksa...';
+      try {
+        const res = await fetch(apiUrl('/api/auth-reset'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            resetIdentifier.includes('@')
+              ? { email: resetIdentifier, newPassword: input.value, checkOnly: true }
+              : { nip: resetIdentifier, newPassword: input.value, checkOnly: true }
+          )
+        });
+        const data = await res.json().catch(() => ({}));
+        const samePassword = res.ok && data.samePassword === true;
+        samePasswordMessage.style.display = samePassword ? 'block' : 'none';
+        submit.disabled = samePassword || !validation.isValid;
+      } catch {
+        submit.disabled = false;
+      } finally {
+        submit.textContent = 'Selesai';
+      }
+    };
+
+    const schedulePasswordCheck = () => {
+      window.clearTimeout(resetCheckTimer);
+      resetCheckTimer = window.setTimeout(checkSamePassword, 450);
+    };
     toggle.addEventListener('click', () => {
       const visible = input.type === 'text';
       input.type = visible ? 'password' : 'text';
@@ -109,11 +152,23 @@ class TeacherApp {
         element.textContent = `${valid ? '✓' : '○'} ${element.textContent.replace(/^[✓○]\s*/, '')}`;
         element.style.color = valid ? '#16a34a' : '#64748b';
       });
-      submit.disabled = !validation.isValid;
+      submit.disabled = !identifierInput.value.trim() || !validation.isValid;
+      schedulePasswordCheck();
+    });
+
+    identifierInput.addEventListener('input', () => {
+      submit.disabled = !identifierInput.value.trim() || !validatePasswordReset(input.value).isValid;
+      schedulePasswordCheck();
     });
 
     document.getElementById('password-reset-form').addEventListener('submit', async event => {
       event.preventDefault();
+      const resetIdentifier = identifierInput.value.trim();
+      if (!resetIdentifier) {
+        showToast('Email atau NIP / ID Guru wajib diisi.', 'error');
+        identifierInput.focus();
+        return;
+      }
       const validation = validatePasswordReset(input.value);
       if (!validation.isValid) {
         showToast('Kata sandi belum memenuhi semua persyaratan.', 'error');
@@ -128,9 +183,9 @@ class TeacherApp {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(
-            identifier.includes('@')
-              ? { email: identifier, newPassword: input.value }
-              : { nip: identifier, newPassword: input.value }
+            resetIdentifier.includes('@')
+              ? { email: resetIdentifier, newPassword: input.value }
+              : { nip: resetIdentifier, newPassword: input.value }
           )
         });
         const data = await res.json().catch(() => ({}));
@@ -174,9 +229,8 @@ class TeacherApp {
 
     if (forgotButton) {
       forgotButton.addEventListener('click', () => {
-        const identifier = window.prompt('Masukkan email atau NIP/ID guru yang terdaftar:');
-        if (!identifier?.trim()) return;
-        this.openPasswordResetModal(identifier.trim());
+        const loginNip = document.getElementById('login-nip')?.value?.trim() || '';
+        this.openPasswordResetModal(loginNip);
       });
     }
 
