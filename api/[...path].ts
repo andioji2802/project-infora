@@ -1,6 +1,12 @@
 import { GoogleGenAI } from '@google/genai';
 import { db, hashPassword, verifyPassword } from '../server/db.js';
 
+export const config = {
+  api: {
+    bodyParser: false
+  }
+};
+
 function cors(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', req.headers?.origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
@@ -37,6 +43,19 @@ export default async function handler(req: any, res: any) {
   const path = new URL(req.url || '/', 'https://project-infora.vercel.app').pathname.replace(/\/$/, '');
   const method = req.method || 'GET';
   let body = req.body || {};
+  if (!req.body && ['POST', 'PUT'].includes(method) && typeof req[Symbol.asyncIterator] === 'function') {
+    let rawBody = '';
+    for await (const chunk of req) {
+      rawBody += Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk);
+    }
+    if (rawBody.trim()) {
+      try {
+        body = JSON.parse(rawBody);
+      } catch {
+        return res.status(400).json({ error: 'Format JSON tidak valid.' });
+      }
+    }
+  }
   if (typeof body === 'string') {
     try {
       body = JSON.parse(body);
